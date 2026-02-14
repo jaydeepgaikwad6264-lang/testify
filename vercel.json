@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "routes": [
+    { "src": "^/$", "dest": "/Frontend/index.html" },
+    { "src": "^/assets/(.*)$", "dest": "/Frontend/assets/$1" },
+    { "src": "^/(privacy-policy|terms|refund-policy|about|contact|medical-disclaimer)$", "dest": "/Frontend/public/$1/index.html" },
+    { "src": "^/(privacy-policy|terms|refund-policy|about|contact|medical-disclaimer)\\.html$", "dest": "/Frontend/public/$1/index.html" },
+    { "src": "^/(.*)$", "dest": "/Frontend/$1" }
+  ]
+}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Complete Profile - Testify</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container p-4">
+        <h4 class="mb-4">Complete Your Provider Profile</h4>
+        <p class="text-muted small">You must complete this step to start accepting bookings.</p>
+        <form id="profileForm">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Select Services</label>
+                <div class="form-check">
+                    <input class="form-check-input service-check" type="checkbox" value="BP Check" id="bpCheck">
+                    <label class="form-check-label" for="bpCheck">BP Check</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input service-check" type="checkbox" value="Sugar Check" id="sugarCheck">
+                    <label class="form-check-label" for="sugarCheck">Sugar Check</label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Experience (Years)</label>
+                <input type="number" class="form-control" id="experience" min="0" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Current Location (Delhi)</label>
+                <div class="row g-2">
+                    <div class="col">
+                        <input type="number" step="any" class="form-control" placeholder="Lat" id="lat" value="28.6139" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" step="any" class="form-control" placeholder="Lng" id="lng" value="77.2090" required>
+                    </div>
+                </div>
+                <small class="text-muted">Defaulted to CP, Delhi for demo.</small>
+            </div>
+            <button type="submit" class="btn btn-success w-100">Apply</button>
+        </form>
+    </div>
+    <script src="assets/js/main.js?v=20260201"></script>
+    <script>
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const services = Array.from(document.querySelectorAll('.service-check:checked')).map(cb => cb.value);
+            const experience = document.getElementById('experience').value;
+            const lat = parseFloat(document.getElementById('lat').value);
+            const lng = parseFloat(document.getElementById('lng').value);
+            const token = localStorage.getItem('token');
+            if(services.length === 0) {
+                alert('Select at least one service');
+                return;
+            }
+            try {
+                const response = await fetch(`${CONFIG.apiBaseUrl}/provider/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        services,
+                        experience,
+                        location: { lat, lng }
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message);
+                alert('Application submitted. Await admin approval.');
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        });
+    </script>
+</body>
+</html>

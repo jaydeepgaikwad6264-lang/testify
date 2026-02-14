@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Profile Loading</title>
+</head>
+<body>
+    <h1>Debug Profile Loading</h1>
+    <div id="debug-info"></div>
+    <div id="test-results"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/auth.js"></script>
+    
+    <script>
+        async function debugProfileLoading() {
+            const debugDiv = document.getElementById('debug-info');
+            const resultsDiv = document.getElementById('test-results');
+            
+            debugDiv.innerHTML = '<h3>Current State:</h3>';
+            
+            // Check localStorage
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            debugDiv.innerHTML += `<p><strong>Token:</strong> ${token ? token.substring(0, 20) + '...' : 'NOT FOUND'}</p>`;
+            debugDiv.innerHTML += `<p><strong>User:</strong> ${user || 'NOT FOUND'}</p>`;
+            
+            if (token && user) {
+                try {
+                    const userData = JSON.parse(user);
+                    debugDiv.innerHTML += `<p><strong>User ID:</strong> ${userData.id}</p>`;
+                    debugDiv.innerHTML += `<p><strong>User Role:</strong> ${userData.role}</p>`;
+                    debugDiv.innerHTML += `<p><strong>User Active:</strong> ${userData.isActive}</p>`;
+                } catch (e) {
+                    debugDiv.innerHTML += `<p><strong>User JSON Parse Error:</strong> ${e.message}</p>`;
+                }
+            }
+            
+            debugDiv.innerHTML += `<p><strong>CONFIG:</strong> ${typeof CONFIG !== 'undefined' ? 'AVAILABLE' : 'NOT FOUND'}</p>`;
+            if (typeof CONFIG !== 'undefined') {
+                debugDiv.innerHTML += `<p><strong>API Base URL:</strong> ${CONFIG.apiBaseUrl}</p>`;
+            }
+            
+            debugDiv.innerHTML += `<p><strong>isAuthenticated():</strong> ${isAuthenticated()}</p>`;
+            
+            // Test API call
+            if (token) {
+                debugDiv.innerHTML += '<h4>Making API Test Call...</h4>';
+                
+                try {
+                    const response = await fetch(`${CONFIG.apiBaseUrl}/auth/profile`, {
+                        method: 'GET',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    debugDiv.innerHTML += `<p><strong>Response Status:</strong> ${response.status}</p>`;
+                    debugDiv.innerHTML += `<p><strong>Response OK:</strong> ${response.ok}</p>`;
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        debugDiv.innerHTML += `<p><strong>Error Response:</strong> ${errorText}</p>`;
+                        
+                        // Try to parse as JSON
+                        try {
+                            const errorJson = JSON.parse(errorText);
+                            debugDiv.innerHTML += `<p><strong>Error JSON:</strong> ${JSON.stringify(errorJson)}</p>`;
+                        } catch (e) {
+                            debugDiv.innerHTML += `<p><strong>Raw Error Text:</strong> ${errorText}</p>`;
+                        }
+                    } else {
+                        const data = await response.json();
+                        debugDiv.innerHTML += `<p><strong>Success! Profile Data:</strong></p>`;
+                        debugDiv.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    }
+                    
+                } catch (fetchError) {
+                    debugDiv.innerHTML += `<p><strong>Fetch Error:</strong> ${fetchError.message}</p>`;
+                    console.error('Fetch error:', fetchError);
+                }
+            }
+        }
+        
+        // Run debug on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Debug page loaded');
+            debugProfileLoading();
+        });
+        
+        // Manual debug button
+        function runDebug() {
+            debugProfileLoading();
+        }
+    </script>
+    
+    <button onclick="runDebug()">Run Debug Again</button>
+</body>
+</html>

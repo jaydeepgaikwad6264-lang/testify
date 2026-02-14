@@ -1,0 +1,14 @@
+node_modules/
+backend/.env
+backend/uploads/
+backend/require-error.txt
+*.log
+*.log.*
+debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
+dist/
+build/
+.DS_Store
