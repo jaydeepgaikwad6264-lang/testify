@@ -3,7 +3,7 @@ const CONFIG = {
     appName: 'Testify',
     allowedCity: 'Delhi',
     currency: '₹',
-    apiBaseUrl: 'https://testify-backend-vhjp.onrender.com/',
+    apiBaseUrl: 'https://testify-backend-vhjp.onrender.com/api',
     googleMapsApiKey: ''
 };
 (() => {
