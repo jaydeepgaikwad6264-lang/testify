@@ -2,27 +2,39 @@ const axios = require('axios');
 
 const BASE_URL = 'https://cpaas.messagecentral.com/verification/v3';
 
+const ensureConfigured = () => {
+    const cid = process.env.MESSAGECENTRAL_CUSTOMER_ID;
+    const tok = process.env.MESSAGECENTRAL_AUTH_TOKEN;
+    if (!cid || !tok) {
+        const msg = 'OTP service not configured';
+        throw new Error(msg);
+    }
+    return { cid, tok };
+};
+
 const sendOtp = async (mobileNumber) => {
+    const { cid, tok } = ensureConfigured();
     try {
-        const response = await axios.post(`${BASE_URL}/send`, null, { // No body data
+        const response = await axios.post(`${BASE_URL}/send`, null, {
             params: {
                 countryCode: '91',
-                customerId: process.env.MESSAGECENTRAL_CUSTOMER_ID,
+                customerId: cid,
                 flowType: 'SMS',
                 mobileNumber: mobileNumber
             },
             headers: {
-                'authToken': process.env.MESSAGECENTRAL_AUTH_TOKEN
+                authToken: tok
             }
         });
         return response.data;
     } catch (error) {
-        console.error('Error sending OTP:', error.response?.data || error.message);
-        throw new Error('Failed to send OTP');
+        const detail = error.response?.data?.message || error.response?.data || error.message;
+        throw new Error(`OTP send failed: ${detail}`);
     }
 };
 
 const validateOtp = async (verificationId, code, mobileNumber) => {
+    const { cid, tok } = ensureConfigured();
     try {
         const response = await axios.get(`${BASE_URL}/validateOtp`, {
             params: {
@@ -30,17 +42,16 @@ const validateOtp = async (verificationId, code, mobileNumber) => {
                 code,
                 countryCode: '91',
                 mobileNumber,
-                customerId: process.env.MESSAGECENTRAL_CUSTOMER_ID
+                customerId: cid
             },
             headers: {
-                'authToken': process.env.MESSAGECENTRAL_AUTH_TOKEN
+                authToken: tok
             }
         });
-
         return response.data;
     } catch (error) {
-        console.error('Error validating OTP:', error.response?.data || error.message);
-        throw new Error('Failed to validate OTP');
+        const detail = error.response?.data?.message || error.response?.data || error.message;
+        throw new Error(`OTP validate failed: ${detail}`);
     }
 };
 

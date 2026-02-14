@@ -94,41 +94,29 @@ const loginUser = async (req, res) => {
 // @access  Public
 const sendOtpController = async (req, res) => {
     const { mobileNumber } = req.body;
-
     if (!mobileNumber) {
         res.status(400);
         throw new Error('Mobile number is required');
     }
-
-    // Call MessageCentral API
-    const response = await otpService.sendOtp(mobileNumber);
-    
-    // Store temp data
-    // Assuming response contains verificationId. If not, check API docs or response structure.
-    // Based on user prompt: "Store temporarily: mobileNumber, verificationId, otpExpiresAt"
-    const verificationId = response.data?.verificationId || response.verificationId; 
-    
-    if (!verificationId) {
-        // If API doesn't return ID immediately, we might need to handle differently.
-        // But let's assume it does for now.
+    try {
+        const response = await otpService.sendOtp(mobileNumber);
+        const verificationId = response.data?.verificationId || response.verificationId || null;
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        await OtpLog.create({
+            mobileNumber,
+            verificationId: verificationId || 'temp_id',
+            expiresAt
+        });
+        res.status(200).json({
+            success: true,
+            message: 'OTP sent successfully',
+            verificationId,
+            mobileNumber
+        });
+    } catch (e) {
+        const msg = e.message || 'Failed to send OTP';
+        res.status(502).json({ message: msg });
     }
-
-    // Store in DB for rate limiting/validation context if needed
-    // Setting expiry to 5 minutes from now
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    
-    await OtpLog.create({
-        mobileNumber,
-        verificationId: verificationId || 'temp_id', // Fallback if API response differs
-        expiresAt
-    });
-
-    res.status(200).json({
-        success: true,
-        message: 'OTP sent successfully',
-        verificationId: verificationId,
-        mobileNumber
-    });
 };
 
 // @desc    Verify OTP and Login/Register
@@ -142,8 +130,13 @@ const verifyOtpController = async (req, res) => {
         throw new Error('Mobile number, OTP and verification ID are required');
     }
 
-    // Verify OTP via MessageCentral
-    const validationResponse = await otpService.validateOtp(verificationId, otp, mobileNumber);
+    let validationResponse = null;
+    try {
+        validationResponse = await otpService.validateOtp(verificationId, otp, mobileNumber);
+    } catch (e) {
+        const msg = e.message || 'Failed to validate OTP';
+        return res.status(400).json({ message: msg });
+    }
 
     // Check validation response status
     // Assuming 'verificationStatus' or similar field. 
