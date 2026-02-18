@@ -207,14 +207,18 @@ const verifyOtpController = async (req, res) => {
         const requestedRole = role || 'user';
         const isProvider = requestedRole === 'provider';
 
-        user = await User.create({
+        const payload = {
             phone: mobileNumber,
             mobileNumber: mobileNumber,
             role: requestedRole,
-            isActive: !isProvider, // Users active, Providers inactive
-            status: isProvider ? 'PENDING' : 'ACTIVE',
+            isActive: !isProvider,
             isProfileComplete: false
-        });
+        };
+        if (isProvider) {
+            payload.status = 'PENDING';
+        }
+
+        user = await User.create(payload);
 
         if (isProvider) {
             res.status(200).json({

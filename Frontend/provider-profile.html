@@ -70,7 +70,12 @@
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message);
-                alert('Application submitted. Await admin approval.');
+                alert('Application submitted. Await admin approval. You will be logged out now.');
+                try {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                } catch (_) {}
+                window.location.href = 'login.html';
             } catch (err) {
                 alert('Error: ' + err.message);
             }
