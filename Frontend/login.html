@@ -127,18 +127,23 @@
 
                 // Handle Success Logic
                 if (data.isProviderPending) {
-                     alert(data.message);
-                     window.location.href = 'provider-profile.html';
-                     return;
+                    alert(data.message || 'Your provider account is under review.');
+                    window.location.href = 'provider-profile.html';
+                    return;
                 }
 
                 if (data.role === 'provider') {
-                    if (data.isActive) {
-                        window.location.href = 'provider-dashboard.html';
-                    } else {
-                        // Should have been caught by isProviderPending, but just in case
-                        window.location.href = 'provider-profile.html'; 
+                    if (data.status === 'REJECTED') {
+                        alert('Your provider account has been rejected. Please contact support.');
+                        logout();
+                        return;
                     }
+                    if (data.status === 'PENDING' || !data.isActive) {
+                        alert('Your provider account is under review.');
+                        window.location.href = 'provider-profile.html';
+                        return;
+                    }
+                    window.location.href = 'provider-dashboard.html';
                 } else {
                     // User Flow
                     if (!data.isProfileComplete) {

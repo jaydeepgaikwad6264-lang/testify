@@ -1,8 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
     if (!isAuthenticated()) { window.location.href = 'login.html'; return; }
     const user = getCurrentUser();
-    if(user.role !== 'provider') { alert("Access Denied"); window.location.href = 'index.html'; return; }
-    if(!user.isActive) { alert("Your application is under review. Please wait for admin activation."); window.location.href = 'provider-profile.html'; return; }
+    if(!user || user.role !== 'provider') { alert("Access Denied"); window.location.href = 'login.html'; return; }
+    if(user.status === 'REJECTED') {
+        alert("Your provider account has been rejected. Please contact support.");
+        logout();
+        return;
+    }
+    if(user.status !== 'APPROVED' || !user.isActive) {
+        alert("Your provider account is under review.");
+        window.location.href = 'provider-profile.html';
+        return;
+    }
     
     // Load provider name
     if (user.name) {

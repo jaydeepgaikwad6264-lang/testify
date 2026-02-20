@@ -37,6 +37,10 @@ const userSchema = new mongoose.Schema({
         enum: ['PENDING', 'APPROVED', 'REJECTED'],
         default: 'PENDING'
     },
+    isApproved: {
+        type: Boolean,
+        default: false
+    },
     isProfileComplete: { // Added per requirement
         type: Boolean,
         default: false

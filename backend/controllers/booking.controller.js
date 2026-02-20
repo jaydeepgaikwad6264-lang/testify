@@ -59,10 +59,11 @@ const getUserBookings = async (req, res) => {
     res.json(bookings);
 };
 
-// @desc    Get provider bookings (requests or active)
-// @route   GET /api/bookings/provider/:providerId
-// @access  Private (Provider)
 const getProviderBookings = async (req, res) => {
+    if (!req.user || req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can access bookings');
+    }
     // Show only active assigned bookings for the provider
     const bookings = await Booking.find({ 
                                     providerId: req.params.providerId,
@@ -74,15 +75,12 @@ const getProviderBookings = async (req, res) => {
     res.json(bookings);
 };
 
-// @desc    Get pending bookings for providers to accept
-// @route   GET /api/bookings/pending
-// @access  Private (Provider)
 const getPendingBookings = async (req, res) => {
     const provider = await User.findById(req.user._id);
 
-    if (!provider || !provider.isActive) {
+    if (!provider || !provider.isActive || provider.status !== 'APPROVED') {
         res.status(403);
-        throw new Error('Provider account is not active');
+        throw new Error('Provider account is not approved');
     }
 
     // Get Service IDs that match provider's offered services
@@ -104,10 +102,11 @@ const getPendingBookings = async (req, res) => {
     res.json(bookings);
 };
 
-// @desc    Accept booking
-// @route   PUT /api/bookings/accept/:bookingId
-// @access  Private (Provider)
 const acceptBooking = async (req, res) => {
+    if (!req.user || req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can accept bookings');
+    }
     const booking = await Booking.findById(req.params.bookingId);
 
     if (booking) {
@@ -133,10 +132,11 @@ const acceptBooking = async (req, res) => {
     }
 };
 
-// @desc    Start booking (On the way)
-// @route   PUT /api/bookings/start/:bookingId
-// @access  Private (Provider)
 const startBooking = async (req, res) => {
+    if (!req.user || req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can start bookings');
+    }
     const booking = await Booking.findById(req.params.bookingId);
 
     if (booking && booking.providerId.equals(req.user._id)) {
@@ -149,10 +149,11 @@ const startBooking = async (req, res) => {
     }
 };
 
-// @desc    Complete booking
-// @route   PUT /api/bookings/complete/:bookingId
-// @access  Private (Provider)
 const completeBooking = async (req, res) => {
+    if (!req.user || req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can complete bookings');
+    }
     const booking = await Booking.findById(req.params.bookingId).populate('serviceId', 'name');
     if (booking && booking.providerId && booking.providerId.equals(req.user._id)) {
         booking.status = 'completed';
@@ -184,6 +185,10 @@ const completeBooking = async (req, res) => {
 };
 
 const cancelBooking = async (req, res) => {
+    if (!req.user || req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can cancel bookings');
+    }
     const booking = await Booking.findById(req.params.bookingId);
     if (!booking) {
         res.status(404);
@@ -203,6 +208,10 @@ const cancelBooking = async (req, res) => {
 };
 
 const ignoreBooking = async (req, res) => {
+    if (!req.user || req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can ignore bookings');
+    }
     const booking = await Booking.findById(req.params.bookingId);
     if (!booking) {
         res.status(404);

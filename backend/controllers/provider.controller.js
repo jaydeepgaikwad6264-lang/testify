@@ -74,6 +74,10 @@ const updateProviderProfile = async (req, res) => {
 module.exports = { getProviderProfile, updateProviderProfile };
 
 const getProviderHistory = async (req, res) => {
+    if (req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can access history');
+    }
     const bookings = await Booking.find({
         providerId: req.user._id,
         status: { $in: ['completed', 'cancelled'] }
@@ -85,6 +89,10 @@ const getProviderHistory = async (req, res) => {
 };
 
 const getProviderWallet = async (req, res) => {
+    if (req.user.role !== 'provider' || req.user.status !== 'APPROVED') {
+        res.status(403);
+        throw new Error('Only approved providers can access wallet');
+    }
     const user = await User.findById(req.user._id).select('walletBalance walletTransactions');
     const tx = (user && user.walletTransactions) || [];
     let bpCount = 0, sugarCount = 0, comboCount = 0;

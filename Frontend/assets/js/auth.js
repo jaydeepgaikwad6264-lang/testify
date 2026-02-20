@@ -49,11 +49,15 @@ async function verifyOtp(otpData) {
         });
         const data = await response.json();
         if (!response.ok) { throw new Error(data.message || 'OTP verification failed'); }
-        
+
         if (data.token) {
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify({
-                id: data._id, name: data.name, role: data.role, isActive: data.isActive
+                id: data._id,
+                name: data.name,
+                role: data.role,
+                status: data.status,
+                isActive: data.isActive
             }));
         }
         return data;

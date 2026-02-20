@@ -3,8 +3,12 @@ const OtpLog = require('../models/OtpLog');
 const otpService = require('../utils/otpService');
 const jwt = require('jsonwebtoken');
 
-const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, {
+const generateToken = (user) => {
+    return jwt.sign({
+        id: user._id,
+        role: user.role,
+        status: user.status || null
+    }, process.env.JWT_SECRET, {
         expiresIn: '30d',
     });
 };
@@ -32,8 +36,8 @@ const registerUser = async (req, res) => {
         email,
         phone,
         password,
-        role: userRole,
-        isActive
+            role: userRole,
+            isActive
     });
 
     if (user) {
@@ -42,8 +46,9 @@ const registerUser = async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            status: user.status,
             isActive: user.isActive,
-            token: generateToken(user._id),
+            token: generateToken(user),
         });
     } else {
         res.status(400);
@@ -80,8 +85,9 @@ const loginUser = async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            status: user.status,
             isActive: user.isActive,
-            token: generateToken(user._id),
+            token: generateToken(user),
         });
     } else {
         res.status(401);
@@ -164,9 +170,10 @@ const verifyOtpController = async (req, res) => {
                     _id: user._id,
                     name: user.name,
                     role: user.role,
+                    status: user.status,
                     isActive: user.isActive,
                     isProfileComplete: user.isProfileComplete,
-                    token: generateToken(user._id)
+                    token: generateToken(user)
                  });
                  return;
             }
@@ -183,9 +190,10 @@ const verifyOtpController = async (req, res) => {
                     _id: user._id,
                     name: user.name,
                     role: user.role,
+                    status: user.status,
                     isActive: user.isActive,
                     isProfileComplete: user.isProfileComplete,
-                    token: generateToken(user._id)
+                    token: generateToken(user)
                  });
                  return;
             }
@@ -197,9 +205,10 @@ const verifyOtpController = async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            status: user.status,
             isActive: user.isActive,
             isProfileComplete: user.isProfileComplete,
-            token: generateToken(user._id),
+            token: generateToken(user),
         });
 
     } else {
@@ -228,9 +237,10 @@ const verifyOtpController = async (req, res) => {
                 _id: user._id,
                 name: user.name,
                 role: user.role,
+                status: user.status,
                 isActive: user.isActive,
                 isProfileComplete: user.isProfileComplete,
-                token: generateToken(user._id)
+                token: generateToken(user)
             });
         } else {
             // User login
@@ -238,9 +248,10 @@ const verifyOtpController = async (req, res) => {
                 _id: user._id,
                 name: user.name,
                 role: user.role,
+                status: user.status,
                 isActive: user.isActive,
                 isProfileComplete: user.isProfileComplete,
-                token: generateToken(user._id),
+                token: generateToken(user),
             });
         }
     }

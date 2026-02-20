@@ -8,7 +8,7 @@ const listUsers = async (req, res) => {
 };
 
 const listProviders = async (req, res) => {
-    const providers = await User.find({ role: 'provider' }).select('_id name email phone isActive status services experience location createdAt');
+    const providers = await User.find({ role: 'provider' }).select('_id name email phone isActive status isApproved services experience location createdAt');
     res.json(providers);
 };
 
@@ -29,6 +29,7 @@ const activateProvider = async (req, res) => {
     }
     provider.isActive = true;
     provider.status = 'APPROVED';
+    provider.isApproved = true;
     await provider.save();
     res.json({ message: 'Provider activated', providerId: provider._id });
 };
@@ -46,6 +47,7 @@ const setProviderStatus = async (req, res) => {
     }
     provider.status = status;
     provider.isActive = status === 'APPROVED';
+    provider.isApproved = status === 'APPROVED';
     await provider.save();
     res.json({ message: 'Provider status updated', providerId: provider._id, status, isActive: provider.isActive });
 };

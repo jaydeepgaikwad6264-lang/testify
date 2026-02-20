@@ -9,9 +9,20 @@
 </head>
 <body>
     <div class="app-container p-4">
-        <h4 class="mb-4">Complete Your Provider Profile</h4>
-        <p class="text-muted small">You must complete this step to start accepting bookings.</p>
-        <form id="profileForm">
+        <div id="pendingScreen" class="d-none">
+            <h4 class="mb-3">Your account is under review</h4>
+            <p class="text-muted small mb-3">
+                Our team is reviewing your provider application. You will be notified once approved.
+            </p>
+            <p class="small mb-3">
+                For support, contact us at <a href="mailto:support@testify.app">support@testify.app</a>.
+            </p>
+            <button type="button" class="btn btn-outline-secondary w-100 mb-2" onclick="logout()">Logout</button>
+        </div>
+        <div id="profileFormContainer">
+            <h4 class="mb-4">Complete Your Provider Profile</h4>
+            <p class="text-muted small">You must complete this step to start accepting bookings.</p>
+            <form id="profileForm">
             <div class="mb-3">
                 <label class="form-label fw-bold">Select Services</label>
                 <div class="form-check">
@@ -40,10 +51,23 @@
                 <small class="text-muted">Defaulted to CP, Delhi for demo.</small>
             </div>
             <button type="submit" class="btn btn-success w-100">Apply</button>
-        </form>
+            </form>
+        </div>
     </div>
     <script src="assets/js/main.js?v=20260201"></script>
+    <script src="assets/js/auth.js"></script>
     <script>
+        (function () {
+            const user = getCurrentUser();
+            if (user && user.role === 'provider' && user.status === 'PENDING' && user.isActive === false) {
+                const pending = document.getElementById('pendingScreen');
+                const formContainer = document.getElementById('profileFormContainer');
+                if (pending && formContainer) {
+                    pending.classList.remove('d-none');
+                    formContainer.classList.add('d-none');
+                }
+            }
+        })();
         document.getElementById('profileForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const services = Array.from(document.querySelectorAll('.service-check:checked')).map(cb => cb.value);
