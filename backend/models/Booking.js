@@ -35,9 +35,9 @@ const bookingSchema = new mongoose.Schema({
         lat: { type: Number },
         lng: { type: Number }
     },
-    reportPdfUrl: {
+    reportUrls: [{
         type: String
-    },
+    }],
     reportUploadedAt: {
         type: Date
     },

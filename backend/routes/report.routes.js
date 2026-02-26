@@ -21,26 +21,19 @@ const storage = multer.diskStorage({
 });
 
 const checkFileType = (file, cb) => {
-    const filetypes = /pdf/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-        return cb(null, true);
-    } else {
-        cb('Error: PDFs Only!');
-    }
+    // Allow all file types
+    cb(null, true);
 };
 
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 10 * 1024 * 1024 }, // Increased to 10MB for 2 files
     fileFilter: function (req, file, cb) {
         checkFileType(file, cb);
     }
 });
 
-router.post('/upload/:bookingId', protect, authorize('provider'), upload.single('report'), asyncHandler(uploadReport));
+router.post('/upload/:bookingId', protect, authorize('provider'), upload.array('report', 2), asyncHandler(uploadReport));
 router.get('/:bookingId', protect, asyncHandler(getReport));
 
 module.exports = router;

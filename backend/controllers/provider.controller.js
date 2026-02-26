@@ -63,6 +63,7 @@ const updateProviderProfile = async (req, res) => {
             isActive: updatedUser.isActive,
             location: updatedUser.location,
             services: updatedUser.services,
+            documents: updatedUser.documents,
             token: req.headers.authorization.split(' ')[1] // Just echo back or re-sign if needed
         });
     } else {
@@ -71,7 +72,39 @@ const updateProviderProfile = async (req, res) => {
     }
 };
 
-module.exports = { getProviderProfile, updateProviderProfile };
+// @desc    Upload documents
+// @route   POST /api/provider/upload-documents
+// @access  Private (Provider)
+const uploadDocuments = async (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        res.status(400);
+        throw new Error('No files uploaded');
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+        const newDocuments = req.files.map(file => ({
+            name: file.originalname,
+            url: `/uploads/${file.filename}`,
+            type: file.mimetype.split('/')[1],
+            uploadedAt: Date.now()
+        }));
+
+        user.documents = [...(user.documents || []), ...newDocuments];
+        await user.save();
+
+        res.json({
+            message: 'Documents uploaded successfully',
+            documents: user.documents
+        });
+    } else {
+        res.status(404);
+        throw new Error('User not found');
+    }
+};
+
+module.exports = { getProviderProfile, updateProviderProfile, uploadDocuments };
 
 const getProviderHistory = async (req, res) => {
     if (req.user.role !== 'provider' || req.user.status !== 'APPROVED') {

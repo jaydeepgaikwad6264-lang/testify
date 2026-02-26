@@ -39,6 +39,11 @@
                 <input type="number" class="form-control" id="experience" min="0" required>
             </div>
             <div class="mb-3">
+                <label class="form-label fw-bold">Upload Documents (Aadhar, License, etc.)</label>
+                <input type="file" class="form-control" id="documents" multiple accept=".jpg,.jpeg,.png,.pdf" required>
+                <small class="text-muted">Max 5 files. JPG, PNG, PDF only.</small>
+            </div>
+            <div class="mb-3">
                 <label class="form-label fw-bold">Current Location (Delhi)</label>
                 <div class="row g-2">
                     <div class="col">
@@ -74,12 +79,33 @@
             const experience = document.getElementById('experience').value;
             const lat = parseFloat(document.getElementById('lat').value);
             const lng = parseFloat(document.getElementById('lng').value);
+            const docFiles = document.getElementById('documents').files;
             const token = localStorage.getItem('token');
             if(services.length === 0) {
                 alert('Select at least one service');
                 return;
             }
+            if(docFiles.length === 0) {
+                alert('Upload at least one document');
+                return;
+            }
             try {
+                // 1. Upload Documents first
+                const formData = new FormData();
+                for (let i = 0; i < docFiles.length; i++) {
+                    formData.append('documents', docFiles[i]);
+                }
+                const uploadRes = await fetch(`${CONFIG.apiBaseUrl}/provider/upload-documents`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.message);
+
+                // 2. Update profile
                 const response = await fetch(`${CONFIG.apiBaseUrl}/provider/profile`, {
                     method: 'PUT',
                     headers: {

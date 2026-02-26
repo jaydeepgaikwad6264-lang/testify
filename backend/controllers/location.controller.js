@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Booking = require('../models/Booking');
 
 // @desc    Update provider location
 // @route   POST /api/location/update
@@ -14,6 +15,29 @@ const updateLocation = async (req, res) => {
     } else {
         res.status(404);
         throw new Error('User not found');
+    }
+};
+
+// @desc    Get provider live location
+// @route   GET /api/location/provider/:bookingId
+// @access  Private (User)
+const getProviderLocationForBooking = async (req, res) => {
+    const { bookingId } = req.params;
+    const booking = await Booking.findById(bookingId).populate('providerId', 'location name');
+    
+    if (booking && booking.userId.toString() === req.user._id.toString()) {
+        if (booking.status === 'accepted') {
+            res.json({
+                providerName: booking.providerId.name,
+                location: booking.providerId.location,
+                status: 'on the way'
+            });
+        } else {
+            res.json({ status: booking.status });
+        }
+    } else {
+        res.status(404);
+        throw new Error('Booking not found or access denied');
     }
 };
 
@@ -37,4 +61,4 @@ const getDirections = async (req, res) => {
     });
 };
 
-module.exports = { updateLocation, getDirections };
+module.exports = { updateLocation, getProviderLocationForBooking, getDirections };

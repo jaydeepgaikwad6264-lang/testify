@@ -4,7 +4,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (user.role !== 'provider') { window.location.href = 'index.html'; return; }
   await fetchWallet();
   await fetchHistory();
+  await fetchProfile();
 });
+
+async function fetchProfile() {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${CONFIG.apiBaseUrl}/provider/profile`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) return;
+    const user = await response.json();
+    const docsList = document.getElementById('docsList');
+    if (docsList && user.documents && user.documents.length > 0) {
+      const apiRoot = CONFIG.apiBaseUrl.replace('/api', '');
+      docsList.innerHTML = user.documents.map(doc => `
+        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+          <div>
+            <div class="fw-bold small">${doc.name}</div>
+            <div class="text-muted" style="font-size: 0.7rem;">${new Date(doc.uploadedAt).toLocaleDateString()}</div>
+          </div>
+          <a href="${apiRoot}${doc.url}" target="_blank" class="btn btn-sm btn-outline-primary">View</a>
+        </div>
+      `).join('');
+    }
+  } catch (_) {}
+}
 
 async function fetchWallet() {
   try {

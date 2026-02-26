@@ -18,6 +18,64 @@ async function loadBookings() {
         document.getElementById('activeBookingContainer').innerHTML = '<div class="alert alert-danger">Failed to load bookings.</div>';
     }
 }
+let __userPollInterval = null;
+function startUserLivePoll() {
+    if (__userPollInterval) clearInterval(__userPollInterval);
+    __userPollInterval = setInterval(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const user = getCurrentUser();
+            const response = await fetch(`${CONFIG.apiBaseUrl}/bookings/user/${user.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const bookings = await response.json();
+            const active = bookings.find(b => ['accepted', 'on_the_way'].includes(b.status));
+            
+            if (active && active.status === 'accepted') {
+                // Fetch provider's live location
+                const locRes = await fetch(`${CONFIG.apiBaseUrl}/location/provider/${active._id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (locRes.ok) {
+                    const locData = await locRes.json();
+                    if (locData.location && locData.location.lat && locData.location.lng) {
+                        updateProviderLocationOnMap(locData.location);
+                        // If provider has moved, we can show 'on the way'
+                        // For now, let's just update the UI status if needed
+                        const timeline = document.querySelector('.booking-status-timeline');
+                        if (timeline) {
+                            const items = timeline.querySelectorAll('.timeline-item');
+                            items[1].classList.add('active', 'fw-bold', 'text-primary');
+                            items[2].classList.add('active', 'fw-bold', 'text-primary');
+                        }
+                    }
+                }
+            } else if (!active) {
+                clearInterval(__userPollInterval);
+                loadBookings(); // Refresh to show completed/cancelled
+            }
+        } catch (e) {
+            console.error('Polling error', e);
+        }
+    }, 60000); // Poll every minute
+}
+
+function updateProviderLocationOnMap(location) {
+    if (window.providerMarker) {
+        window.providerMarker.setPosition(new google.maps.LatLng(location.lat, location.lng));
+    } else if (window.map) {
+        window.providerMarker = new google.maps.Marker({
+            position: new google.maps.LatLng(location.lat, location.lng),
+            map: window.map,
+            icon: {
+                url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                scaledSize: new google.maps.Size(40, 40)
+            },
+            title: 'Provider'
+        });
+    }
+}
+
 function renderBookings(bookings) {
     const activeBookingContainer = document.getElementById('activeBookingContainer');
     const pastBookingsList = document.getElementById('pastBookingsList');
@@ -71,7 +129,7 @@ function renderBookings(bookings) {
     let pastHTML = '';
     pastBookings.forEach(booking => {
         const serviceName = booking.serviceId ? booking.serviceId.name : 'Unknown Service';
-        const price = booking.serviceId ? `₹${booking.serviceId.price}` : '-';
+        const price = booking.price ? `₹${booking.price}` : (booking.serviceId ? `₹${booking.serviceId.price}` : '-');
         pastHTML += `
             <div class="list-group-item border-0 border-bottom py-3">
                 <div class="d-flex justify-content-between">
@@ -84,10 +142,15 @@ function renderBookings(bookings) {
                         <span class="badge bg-success bg-opacity-10 text-success">${booking.status}</span>
                     </div>
                 </div>
-                ${(booking.reportPdfUrl || booking.reportUrl) ? `
-                <button class="btn btn-sm btn-outline-secondary mt-2" onclick="downloadReport('${booking.reportPdfUrl || booking.reportUrl}')">
-                    <i class="bi bi-file-earmark-pdf"></i> Download Readings PDF
-                </button>` : ''}
+                ${(booking.reportUrls && booking.reportUrls.length > 0) ? 
+                    booking.reportUrls.map((url, index) => `
+                        <button class="btn btn-sm btn-outline-secondary mt-2 me-2" onclick="downloadReport('${url}')">
+                            <i class="bi bi-file-earmark"></i> Readings ${index + 1}
+                        </button>
+                    `).join('') : (booking.reportPdfUrl || booking.reportUrl) ? `
+                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="downloadReport('${booking.reportPdfUrl || booking.reportUrl}')">
+                        <i class="bi bi-file-earmark-pdf"></i> Download Readings PDF
+                    </button>` : ''}
             </div>
         `;
     });

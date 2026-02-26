@@ -64,6 +64,12 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    documents: [{
+        name: { type: String },
+        url: { type: String },
+        type: { type: String }, // e.g. "Aadhar Card", "Medical License"
+        uploadedAt: { type: Date, default: Date.now }
+    }],
     walletBalance: {
         type: Number,
         default: 0

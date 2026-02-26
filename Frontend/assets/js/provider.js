@@ -21,8 +21,38 @@ document.addEventListener('DOMContentLoaded', () => {
     initBell();
     initOnlineToggle();
     fetchRequests(); fetchActiveJob();
-    initProviderMap(); setInterval(fetchRequests, 3000);
+    initProviderMap(); 
+    setInterval(fetchRequests, 3000);
+    setInterval(updateLiveLocation, 60000); // Update location every minute
 });
+
+async function updateLiveLocation() {
+    if (!navigator.geolocation) return;
+    
+    // Only update if there's an active job
+    if (!window.__activeBookingId) return;
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`${CONFIG.apiBaseUrl}/location/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ lat: latitude, lng: longitude })
+            });
+            console.log('Live location updated');
+        } catch (e) {
+            console.error('Failed to update live location', e);
+        }
+    }, (err) => {
+        console.error('Geolocation error', err);
+    });
+}
+
 let __lastPendingIds = new Set();
 let __isOnline = true;
 function initOnlineToggle() {
@@ -90,7 +120,7 @@ function renderRequests(requests) {
     let html = '';
     requests.forEach(req => {
         const serviceName = req.serviceId ? req.serviceId.name : 'Unknown Service';
-        const price = req.serviceId ? `₹${req.serviceId.price}` : '-';
+        const price = req.price ? `₹${req.price}` : (req.serviceId ? `₹${req.serviceId.price}` : '-');
         const location = req.userLocation && req.userLocation.address ? req.userLocation.address : 'Delhi';
         const customerName = req.userId && req.userId.name ? req.userId.name : 'Customer';
         const customerPhone = (req.userId && (req.userId.mobileNumber || req.userId.phone)) ? (req.userId.mobileNumber || req.userId.phone) : '';
@@ -147,9 +177,9 @@ async function acceptRequest(id) {
         document.getElementById('activeService').textContent = data.serviceId?.name || 'Service';
         document.getElementById('activeLocation').textContent = data.userLocation?.address || 'Delhi';
         window.currentJobId = id; localStorage.setItem('currentJobId', id);
+        window.__activeBookingId = id;
         renderActiveJobOnMap(data); setupNavigateButton(data);
-        // Start live location updates immediately after accept
-        startProviderLiveLocation(id);
+        updateLiveLocation(); // Update location immediately after accept
     } catch (error) { alert("Error accepting booking: " + error.message); }
 }
 async function fetchActiveJob() {
@@ -161,6 +191,7 @@ async function fetchActiveJob() {
         const bookings = await res.json();
         const active = bookings.find(b => ['accepted', 'on_the_way'].includes(b.status));
         if (active) {
+            window.__activeBookingId = active._id;
             document.getElementById('requestsSection').classList.add('d-none');
             document.getElementById('activeJobSection').classList.remove('d-none');
             
@@ -330,16 +361,36 @@ function startProviderLiveLocation(bookingId) {
 }
 async function completeJob() {
     const fileInput = document.getElementById('reportUpload');
-    if(fileInput.files.length === 0) { alert("Please upload the medical report (PDF) first."); return; }
-    const file = fileInput.files[0]; const formData = new FormData(); formData.append('report', file);
-    const bookingId = window.currentJobId || localStorage.getItem('currentJobId'); if (!bookingId) { alert("No active booking found."); return; }
+    if(fileInput.files.length === 0) { alert("Please upload the medical readings first."); return; }
+    if(fileInput.files.length > 2) { alert("You can upload maximum 2 files."); return; }
+    
+    const formData = new FormData();
+    for (let i = 0; i < fileInput.files.length; i++) {
+        formData.append('report', fileInput.files[i]);
+    }
+    
+    const bookingId = window.currentJobId || localStorage.getItem('currentJobId'); 
+    if (!bookingId) { alert("No active booking found."); return; }
+    
     try {
         const token = localStorage.getItem('token');
-        const uploadRes = await fetch(`${CONFIG.apiBaseUrl}/report/upload/${bookingId}`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
-        const uploadData = await uploadRes.json(); if(!uploadRes.ok) throw new Error(uploadData.message);
-        const completeRes = await fetch(`${CONFIG.apiBaseUrl}/bookings/complete/${bookingId}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
-        const completeData = await completeRes.json(); if (!completeRes.ok) throw new Error(completeData.message || 'Failed to mark completed');
-        alert("Job Completed & Report Sent!"); localStorage.removeItem('currentJobId');
+        const uploadRes = await fetch(`${CONFIG.apiBaseUrl}/report/upload/${bookingId}`, { 
+            method: 'POST', 
+            headers: { 'Authorization': `Bearer ${token}` }, 
+            body: formData 
+        });
+        const uploadData = await uploadRes.json(); 
+        if(!uploadRes.ok) throw new Error(uploadData.message);
+        
+        const completeRes = await fetch(`${CONFIG.apiBaseUrl}/bookings/complete/${bookingId}`, { 
+            method: 'PUT', 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const completeData = await completeRes.json(); 
+        if (!completeRes.ok) throw new Error(completeData.message || 'Failed to mark completed');
+        
+        alert("Job Completed & Readings Sent!"); 
+        localStorage.removeItem('currentJobId');
         document.getElementById('activeJobSection').classList.add('d-none');
         document.getElementById('requestsSection').classList.remove('d-none');
         fetchRequests();
