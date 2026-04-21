@@ -95,9 +95,10 @@ async function fetchHistory() {
         c.innerHTML = completed.map(b => {
             const name = b.serviceId ? b.serviceId.name : 'Service';
             const when = new Date(b.createdAt).toLocaleString();
+            const sched = (b.scheduledDate || b.timeSlot) ? `<div class="text-primary small fw-bold">Scheduled: ${b.scheduledDate || ''} ${b.timeSlot || ''}</div>` : '';
             const status = b.status;
             const addr = b.userLocation && b.userLocation.address ? b.userLocation.address : '';
-            return `<div class="col-md-6"><div class="card border-0 shadow-sm"><div class="card-body"><div class="d-flex justify-content-between mb-2"><div class="fw-bold">${name}</div><span class="badge ${status==='completed'?'bg-success':'bg-secondary'}">${status}</span></div><div class="small text-muted">${when}</div><div class="small">${addr}</div></div></div></div>`;
+            return `<div class="col-md-6"><div class="card border-0 shadow-sm"><div class="card-body"><div class="d-flex justify-content-between mb-2"><div class="fw-bold">${name}</div><span class="badge ${status==='completed'?'bg-success':'bg-secondary'}">${status}</span></div>${sched}<div class="small text-muted">${when}</div><div class="small">${addr}</div></div></div></div>`;
         }).join('');
     } catch (e) { console.error('History load failed', e); }
 }
@@ -124,6 +125,11 @@ function renderRequests(requests) {
         const location = req.userLocation && req.userLocation.address ? req.userLocation.address : 'Delhi';
         const customerName = req.userId && req.userId.name ? req.userId.name : 'Customer';
         const customerPhone = (req.userId && (req.userId.mobileNumber || req.userId.phone)) ? (req.userId.mobileNumber || req.userId.phone) : '';
+        const scheduledInfo = (req.scheduledDate || req.timeSlot) 
+            ? `<div class="mt-2 p-2 bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded">
+                <small class="fw-bold text-dark"><i class="bi bi-calendar-event me-1"></i> Scheduled: ${req.scheduledDate || ''} ${req.timeSlot || ''}</small>
+               </div>`
+            : '';
         
         html += `
             <div class="card border-0 shadow-sm mb-3 request-card" id="card-${req._id}">
@@ -141,6 +147,7 @@ function renderRequests(requests) {
                         </div>
                         <small class="text-muted d-block"><i class="bi bi-geo-alt-fill text-danger"></i> ${location}</small>
                         <small class="text-muted"><i class="bi bi-clock"></i> ${new Date(req.createdAt).toLocaleTimeString()}</small>
+                        ${scheduledInfo}
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-danger flex-grow-1" onclick="rejectRequest('${req._id}')">Ignore</button>
@@ -176,6 +183,18 @@ async function acceptRequest(id) {
         document.getElementById('activeCustomerPhone').href = `tel:${data.userId?.mobileNumber}`;
         document.getElementById('activeService').textContent = data.serviceId?.name || 'Service';
         document.getElementById('activeLocation').textContent = data.userLocation?.address || 'Delhi';
+        
+        const scheduleContainer = document.getElementById('activeScheduleContainer');
+        const scheduleText = document.getElementById('activeSchedule');
+        if (scheduleContainer && scheduleText) {
+            if (data.scheduledDate || data.timeSlot) {
+                scheduleContainer.classList.remove('d-none');
+                scheduleText.textContent = `${data.scheduledDate || ''} ${data.timeSlot || ''}`;
+            } else {
+                scheduleContainer.classList.add('d-none');
+            }
+        }
+        
         window.currentJobId = id; localStorage.setItem('currentJobId', id);
         window.__activeBookingId = id;
         renderActiveJobOnMap(data); setupNavigateButton(data);
@@ -201,6 +220,17 @@ async function fetchActiveJob() {
             document.getElementById('activeCustomerName').textContent = customerName;
             document.getElementById('activeService').textContent = active.serviceId?.name || 'Service';
             document.getElementById('activeLocation').textContent = active.userId?.location?.address || 'Delhi';
+            
+            const scheduleContainer = document.getElementById('activeScheduleContainer');
+            const scheduleText = document.getElementById('activeSchedule');
+            if (scheduleContainer && scheduleText) {
+                if (active.scheduledDate || active.timeSlot) {
+                    scheduleContainer.classList.remove('d-none');
+                    scheduleText.textContent = `${active.scheduledDate || ''} ${active.timeSlot || ''}`;
+                } else {
+                    scheduleContainer.classList.add('d-none');
+                }
+            }
             
             // Update phone link
             const phoneLink = document.getElementById('activeCustomerPhone');

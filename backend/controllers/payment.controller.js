@@ -89,7 +89,7 @@ const createOrder = async (req, res) => {
 };
 
 const verifyPayment = async (req, res) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, serviceId, serviceName, location, userLocation } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, serviceId, serviceName, location, userLocation, scheduledDate, timeSlot } = req.body;
     let key_secret = process.env.RAZORPAY_KEY_SECRET;
     if (!key_secret) {
         try { require('dotenv').config({ path: path.join(__dirname, '..', '.env') }); } catch (_) {}
@@ -149,7 +149,9 @@ const verifyPayment = async (req, res) => {
         paymentStatus: 'paid',
         razorpayOrderId: razorpay_order_id,
         razorpayPaymentId: razorpay_payment_id,
-        razorpaySignature: razorpay_signature
+        razorpaySignature: razorpay_signature,
+        scheduledDate: scheduledDate || null,
+        timeSlot: timeSlot || null
     });
 
     res.status(201).json(booking);

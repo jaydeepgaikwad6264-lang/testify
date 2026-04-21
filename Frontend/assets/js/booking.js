@@ -169,6 +169,8 @@ async function createBooking() {
     const state = (document.getElementById('stateInput') && document.getElementById('stateInput').value) || '';
     const district = (document.getElementById('districtInput') && document.getElementById('districtInput').value) || '';
     const pin = (document.getElementById('pinInput') && document.getElementById('pinInput').value) || '';
+    const scheduledDate = document.getElementById('scheduledDate').value;
+    const timeSlot = document.getElementById('timeSlot').value;
     const token = localStorage.getItem('token');
     
     if(!customerName) { alert("Please enter your name."); return; }
@@ -222,7 +224,9 @@ async function createBooking() {
                             serviceId,
                             serviceName,
                             customerName,
-                            location: { address: location, house, area, city, state, district, pin, lat: parseFloat(lat), lng: parseFloat(lng) }
+                            location: { address: location, house, area, city, state, district, pin, lat: parseFloat(lat), lng: parseFloat(lng) },
+                            scheduledDate,
+                            timeSlot
                         })
                     });
                     const verifyText = await verifyResp.text();

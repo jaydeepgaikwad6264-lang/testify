@@ -30,6 +30,26 @@
                 </select>
             </div>
             <div class="mb-4">
+                <label class="form-label fw-bold">Schedule (Optional)</label>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="small text-muted mb-1">Select Date</label>
+                        <input type="date" class="form-control" id="scheduledDate">
+                    </div>
+                    <div class="col-6">
+                        <label class="small text-muted mb-1">Time Slot</label>
+                        <select class="form-select" id="timeSlot">
+                            <option value="">Any Time</option>
+                            <option value="10:00 AM - 12:00 PM">10:00 AM - 12:00 PM</option>
+                            <option value="12:00 PM - 02:00 PM">12:00 PM - 02:00 PM</option>
+                            <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM</option>
+                            <option value="04:00 PM - 06:00 PM">04:00 PM - 06:00 PM</option>
+                            <option value="06:00 PM - 08:00 PM">06:00 PM - 08:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
                 <label class="form-label fw-bold">Location</label>
                 <div class="input-group mb-2">
                     <span class="input-group-text bg-white"><i class="bi bi-geo-alt text-danger"></i></span>

@@ -7,7 +7,7 @@ const { isLocationInDelhi } = require('../utils/delhiValidator');
 // @route   POST /api/bookings/create
 // @access  Private (User)
 const createBooking = async (req, res) => {
-    const { serviceId, serviceName, location, userLocation } = req.body;
+    const { serviceId, serviceName, location, userLocation, scheduledDate, timeSlot } = req.body;
     
     // Support both 'location' (frontend) and 'userLocation' (schema) keys
     const finalLocation = userLocation || location;
@@ -42,7 +42,9 @@ const createBooking = async (req, res) => {
         serviceId: service._id,
         userLocation: finalLocation,
         price: priceOverride,
-        status: 'pending'
+        status: 'pending',
+        scheduledDate: scheduledDate || null,
+        timeSlot: timeSlot || null
     });
 
     res.status(201).json(booking);

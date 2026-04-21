@@ -62,6 +62,12 @@ const bookingSchema = new mongoose.Schema({
     },
     razorpaySignature: {
         type: String
+    },
+    scheduledDate: {
+        type: String // Optional: e.g. "2024-05-20"
+    },
+    timeSlot: {
+        type: String // Optional: e.g. "10:00 AM - 11:00 AM"
     }
 }, { timestamps: true });
 
