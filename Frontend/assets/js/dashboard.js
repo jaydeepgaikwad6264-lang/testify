@@ -1,72 +1,72 @@
+const USER_REFRESH_INTERVAL_MS = 5000;
+let __USER_MAP__ = null;
+let __USER_ACTIVE_POLL__ = null;
+let __lastBookingSnapshot = '';
+let __isRefreshingBookings = false;
+
 document.addEventListener('DOMContentLoaded', () => {
     if (!isAuthenticated()) { window.location.href = 'login.html'; return; }
     const user = getCurrentUser();
     document.getElementById('userNameDisplay').textContent = user.name || 'User';
-    loadBookings();
+    refreshBookings({ forceRender: true });
+    startUserLivePoll();
+    window.addEventListener('focus', () => refreshBookings({ forceRender: true }));
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            refreshBookings({ forceRender: true });
+        }
+    });
 });
+
 async function loadBookings() {
+    const token = localStorage.getItem('token');
+    const user = getCurrentUser();
+    const response = await fetch(`${CONFIG.apiBaseUrl}/bookings/user/${user.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-store'
+    });
+    if (!response.ok) {
+        if (response.status === 401) { logout(); return []; }
+        throw new Error(`Failed to load bookings (${response.status})`);
+    }
+    return response.json();
+}
+
+async function refreshBookings(options = {}) {
+    const { forceRender = false } = options;
+    if (__isRefreshingBookings) return;
+    __isRefreshingBookings = true;
     try {
-        const token = localStorage.getItem('token');
-        const user = getCurrentUser();
-        const response = await fetch(`${CONFIG.apiBaseUrl}/bookings/user/${user.id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const bookings = await response.json();
-        renderBookings(bookings);
+        const bookings = await loadBookings();
+        const snapshot = JSON.stringify((bookings || []).map(b => ({
+            id: b._id,
+            status: b.status,
+            providerId: b.providerId?._id || b.providerId || null,
+            providerPhone: b.providerId?.mobileNumber || b.providerId?.phone || '',
+            providerName: b.providerId?.name || '',
+            providerLat: b.providerLocation?.lat ?? null,
+            providerLng: b.providerLocation?.lng ?? null,
+            updatedAt: b.updatedAt || b.createdAt
+        })));
+        if (forceRender || snapshot !== __lastBookingSnapshot) {
+            __lastBookingSnapshot = snapshot;
+            renderBookings(bookings || []);
+        }
     } catch (error) {
         console.error("Error loading bookings:", error);
         document.getElementById('activeBookingContainer').innerHTML = '<div class="alert alert-danger">Failed to load bookings.</div>';
+    } finally {
+        __isRefreshingBookings = false;
     }
-}
-let __userPollInterval = null;
-function startUserLivePoll() {
-    if (__userPollInterval) clearInterval(__userPollInterval);
-    __userPollInterval = setInterval(async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const user = getCurrentUser();
-            const response = await fetch(`${CONFIG.apiBaseUrl}/bookings/user/${user.id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const bookings = await response.json();
-            const active = bookings.find(b => ['accepted', 'on_the_way'].includes(b.status));
-            
-            if (active && active.status === 'accepted') {
-                // Fetch provider's live location
-                const locRes = await fetch(`${CONFIG.apiBaseUrl}/location/provider/${active._id}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (locRes.ok) {
-                    const locData = await locRes.json();
-                    if (locData.location && locData.location.lat && locData.location.lng) {
-                        updateProviderLocationOnMap(locData.location);
-                        // If provider has moved, we can show 'on the way'
-                        // For now, let's just update the UI status if needed
-                        const timeline = document.querySelector('.booking-status-timeline');
-                        if (timeline) {
-                            const items = timeline.querySelectorAll('.timeline-item');
-                            items[1].classList.add('active', 'fw-bold', 'text-primary');
-                            items[2].classList.add('active', 'fw-bold', 'text-primary');
-                        }
-                    }
-                }
-            } else if (!active) {
-                clearInterval(__userPollInterval);
-                loadBookings(); // Refresh to show completed/cancelled
-            }
-        } catch (e) {
-            console.error('Polling error', e);
-        }
-    }, 60000); // Poll every minute
 }
 
 function updateProviderLocationOnMap(location) {
-    if (window.providerMarker) {
-        window.providerMarker.setPosition(new google.maps.LatLng(location.lat, location.lng));
-    } else if (window.map) {
-        window.providerMarker = new google.maps.Marker({
+    if (__USER_MAP__ && __USER_MAP__.providerMarker) {
+        __USER_MAP__.providerMarker.setPosition(new google.maps.LatLng(location.lat, location.lng));
+    } else if (__USER_MAP__ && __USER_MAP__.map) {
+        __USER_MAP__.providerMarker = new google.maps.Marker({
             position: new google.maps.LatLng(location.lat, location.lng),
-            map: window.map,
+            map: __USER_MAP__.map,
             icon: {
                 url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
                 scaledSize: new google.maps.Size(40, 40)
@@ -91,6 +91,12 @@ function renderBookings(bookings) {
         const serviceName = activeBooking.serviceId ? activeBooking.serviceId.name : 'Unknown Service';
         const providerName = activeBooking.providerId ? activeBooking.providerId.name : 'Searching Provider...';
         const providerPhone = (activeBooking.providerId && (activeBooking.providerId.mobileNumber || activeBooking.providerId.phone)) ? (activeBooking.providerId.mobileNumber || activeBooking.providerId.phone) : '';
+        const scheduledInfo = (activeBooking.scheduledDate || activeBooking.timeSlot)
+            ? `<div class="alert alert-light border mt-3 mb-0">
+                    <div class="fw-bold"><i class="bi bi-calendar-event me-1"></i> Scheduled Booking</div>
+                    <small class="text-muted">${activeBooking.scheduledDate || 'Flexible date'} ${activeBooking.timeSlot || 'Any time'}</small>
+               </div>`
+            : '';
         const activeHTML = `
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-body">
@@ -113,6 +119,7 @@ function renderBookings(bookings) {
                         </div>
                         ${providerPhone ? `<a href="tel:${providerPhone}" class="btn btn-success rounded-circle btn-sm p-2"><i class="bi bi-telephone-fill"></i></a>` : ''}
                     </div>
+                    ${scheduledInfo}
                     <div class="mt-3">
                         <div id="userMap" class="map-container shadow-sm border"></div>
                     </div>
@@ -122,7 +129,6 @@ function renderBookings(bookings) {
         activeBookingContainer.innerHTML = activeHTML;
         initUserMap();
         renderActiveBookingOnMap(activeBooking);
-        startUserLivePoll();
     } else {
         activeBookingContainer.innerHTML = '<div class="text-center text-muted py-5">No active bookings. <a href="booking.html">Book Now</a></div>';
     }
@@ -130,6 +136,9 @@ function renderBookings(bookings) {
     pastBookings.forEach(booking => {
         const serviceName = booking.serviceId ? booking.serviceId.name : 'Unknown Service';
         const price = booking.price ? `₹${booking.price}` : (booking.serviceId ? `₹${booking.serviceId.price}` : '-');
+        const scheduledInfo = (booking.scheduledDate || booking.timeSlot)
+            ? `<div class="small text-primary fw-bold mt-1"><i class="bi bi-calendar-event me-1"></i>${booking.scheduledDate || 'Flexible date'} ${booking.timeSlot || 'Any time'}</div>`
+            : '';
         pastHTML += `
             <div class="list-group-item border-0 border-bottom py-3">
                 <div class="d-flex justify-content-between">
@@ -142,6 +151,7 @@ function renderBookings(bookings) {
                         <span class="badge bg-success bg-opacity-10 text-success">${booking.status}</span>
                     </div>
                 </div>
+                ${scheduledInfo}
                 ${(booking.reportUrls && booking.reportUrls.length > 0) ? 
                     booking.reportUrls.map((url, index) => `
                         <button class="btn btn-sm btn-outline-secondary mt-2 me-2" onclick="downloadReport('${url}')">
@@ -167,8 +177,6 @@ function downloadReport(url) {
     const abs = /^https?:\/\//i.test(normalized) ? normalized : `${base}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
     window.open(abs, '_blank');
 }
-let __USER_MAP__ = null;
-let __USER_ACTIVE_POLL__ = null;
 function initUserMap() {
     const el = document.getElementById('userMap');
     if (!el) return;
@@ -211,23 +219,17 @@ function startUserLivePoll() {
     if (__USER_ACTIVE_POLL__) clearInterval(__USER_ACTIVE_POLL__);
     __USER_ACTIVE_POLL__ = setInterval(async () => {
         try {
+            if (document.visibilityState !== 'visible') return;
+            await refreshBookings();
             const token = localStorage.getItem('token');
             const res = await fetch(`${CONFIG.apiBaseUrl}/bookings/user/active`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token}` },
+                cache: 'no-store'
             });
             if (!res.ok) return;
             const booking = await res.json();
             if (!booking) return;
-            // Update call button to provider number if available
-            const container = document.getElementById('activeBookingContainer');
-            if (container && booking.providerId?.mobileNumber) {
-                const btns = container.querySelectorAll('a[href^="tel:"]');
-                if (btns.length === 0) {
-                    // Re-render to ensure call button present
-                    loadBookings();
-                }
-            }
             renderActiveBookingOnMap(booking);
         } catch (_) {}
-    }, 1000);
+    }, USER_REFRESH_INTERVAL_MS);
 }

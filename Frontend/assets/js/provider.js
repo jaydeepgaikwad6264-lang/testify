@@ -1,3 +1,8 @@
+const PROVIDER_REQUEST_REFRESH_MS = 5000;
+const PROVIDER_LOCATION_REFRESH_MS = 60000;
+let __PROVIDER_REQUESTS_TIMER__ = null;
+let __PROVIDER_DASHBOARD_SYNC_TIMER__ = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     if (!isAuthenticated()) { window.location.href = 'login.html'; return; }
     const user = getCurrentUser();
@@ -22,9 +27,36 @@ document.addEventListener('DOMContentLoaded', () => {
     initOnlineToggle();
     fetchRequests(); fetchActiveJob();
     initProviderMap(); 
-    setInterval(fetchRequests, 3000);
-    setInterval(updateLiveLocation, 60000); // Update location every minute
+    setupDashboardAutoRefresh();
 });
+
+function setupDashboardAutoRefresh() {
+    if (__PROVIDER_REQUESTS_TIMER__) clearInterval(__PROVIDER_REQUESTS_TIMER__);
+    if (__PROVIDER_DASHBOARD_SYNC_TIMER__) clearInterval(__PROVIDER_DASHBOARD_SYNC_TIMER__);
+
+    __PROVIDER_REQUESTS_TIMER__ = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        fetchRequests();
+    }, PROVIDER_REQUEST_REFRESH_MS);
+
+    __PROVIDER_DASHBOARD_SYNC_TIMER__ = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        fetchActiveJob();
+        updateLiveLocation();
+    }, PROVIDER_LOCATION_REFRESH_MS);
+
+    window.addEventListener('focus', () => {
+        fetchRequests();
+        fetchActiveJob();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            fetchRequests();
+            fetchActiveJob();
+        }
+    });
+}
 
 async function updateLiveLocation() {
     if (!navigator.geolocation) return;
@@ -73,7 +105,10 @@ async function fetchRequests() {
     if (!__isOnline) return;
     try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${CONFIG.apiBaseUrl}/bookings/pending`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await fetch(`${CONFIG.apiBaseUrl}/bookings/pending`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            cache: 'no-store'
+        });
         if(!response.ok) return;
         const requests = await response.json();
         renderRequests(requests);
@@ -199,13 +234,17 @@ async function acceptRequest(id) {
         window.__activeBookingId = id;
         renderActiveJobOnMap(data); setupNavigateButton(data);
         updateLiveLocation(); // Update location immediately after accept
+        fetchActiveJob();
     } catch (error) { alert("Error accepting booking: " + error.message); }
 }
 async function fetchActiveJob() {
     try {
         const token = localStorage.getItem('token');
         const user = getCurrentUser();
-        const res = await fetch(`${CONFIG.apiBaseUrl}/bookings/provider/${user.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${CONFIG.apiBaseUrl}/bookings/provider/${user.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            cache: 'no-store'
+        });
         if (!res.ok) return;
         const bookings = await res.json();
         const active = bookings.find(b => ['accepted', 'on_the_way'].includes(b.status));
@@ -219,7 +258,7 @@ async function fetchActiveJob() {
             
             document.getElementById('activeCustomerName').textContent = customerName;
             document.getElementById('activeService').textContent = active.serviceId?.name || 'Service';
-            document.getElementById('activeLocation').textContent = active.userId?.location?.address || 'Delhi';
+            document.getElementById('activeLocation').textContent = active.userLocation?.address || 'Delhi';
             
             const scheduleContainer = document.getElementById('activeScheduleContainer');
             const scheduleText = document.getElementById('activeSchedule');
@@ -248,6 +287,8 @@ async function fetchActiveJob() {
             renderActiveJobOnMap(active); setupNavigateButton(active);
             startProviderLiveLocation(active._id);
         } else {
+            if (__PROVIDER_LOC_TIMER__) { clearInterval(__PROVIDER_LOC_TIMER__); __PROVIDER_LOC_TIMER__ = null; }
+            window.__activeBookingId = null;
             document.getElementById('requestsSection').classList.remove('d-none');
             document.getElementById('activeJobSection').classList.add('d-none');
         }
@@ -421,9 +462,11 @@ async function completeJob() {
         
         alert("Job Completed & Readings Sent!"); 
         localStorage.removeItem('currentJobId');
+        window.__activeBookingId = null;
         document.getElementById('activeJobSection').classList.add('d-none');
         document.getElementById('requestsSection').classList.remove('d-none');
         fetchRequests();
+        fetchActiveJob();
     } catch (error) { alert("Error completing job: " + error.message); }
 }
 async function cancelJob() {
@@ -433,8 +476,10 @@ async function cancelJob() {
         const res = await fetch(`${CONFIG.apiBaseUrl}/bookings/cancel/${bookingId}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json(); if (!res.ok) throw new Error(data.message || 'Failed to cancel');
         alert('Service cancelled.'); localStorage.removeItem('currentJobId');
+        window.__activeBookingId = null;
         document.getElementById('activeJobSection').classList.add('d-none');
         document.getElementById('requestsSection').classList.remove('d-none');
         fetchRequests();
+        fetchActiveJob();
     } catch (e) { alert('Error cancelling: ' + e.message); }
 }

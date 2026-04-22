@@ -124,6 +124,7 @@ const acceptBooking = async (req, res) => {
         const updatedBooking = await booking.save();
         
         const populatedBooking = await Booking.findById(updatedBooking._id)
+            .populate('serviceId')
             .populate('userId', 'name mobileNumber')
             .populate('providerId', 'name mobileNumber');
 
