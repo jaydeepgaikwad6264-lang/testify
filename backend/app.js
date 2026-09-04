@@ -35,7 +35,6 @@ const corsOptions = {
   maxAge: 600
 };
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 // Body Parsers with limits
 app.use(express.json({ limit: '1mb' }));
