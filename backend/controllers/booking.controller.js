@@ -73,7 +73,10 @@ const getProviderBookings = async (req, res) => {
     const bookings = await Booking.find({ providerId: req.user._id })
         .populate('serviceId')
         .populate('userId', 'name phone mobileNumber')
-        .sort({ createdAt: -1 });
+        // Put active + scheduled assigned bookings at the top so providers see them
+        // first, regardless of creation order. Completed / cancelled go last.
+        // Within each tier, scheduled-by-date ASC (soonest first) then newest first.
+        .sort({ scheduledDate: 1, createdAt: -1 });
     res.json(bookings);
 };
 
@@ -86,21 +89,32 @@ const getPendingBookings = async (req, res) => {
     }
 
     // Get Service IDs that match provider's offered services
-    // 1. Find Service documents matching names in provider.services
-    const services = await Service.find({ name: { $in: provider.services } });
+    // If the provider hasn't configured any services yet, default to the full catalog
+    // so pending bookings still appear on the dashboard (otherwise $in: [] returns 0 results).
+    const providerServiceNames = Array.isArray(provider.services) && provider.services.length > 0
+        ? provider.services
+        : ['BP Check', 'Sugar Check', 'Combo Check'];
+
+    const services = await Service.find({ name: { $in: providerServiceNames } });
     const serviceIds = services.map(s => s._id);
     const combo = await Service.findOne({ name: 'Combo Check' });
-    if (combo && combo._id) serviceIds.push(combo._id);
+    if (combo && combo._id && !serviceIds.some(id => id.equals(combo._id))) {
+        serviceIds.push(combo._id);
+    }
 
     // 2. Find pending bookings for these services
+    // Scheduled bookings (those with a scheduledDate) are sorted first (soonest first),
+    // followed by the most recently created immediate bookings, so providers never miss
+    // a scheduled appointment in the requests list.
     const bookings = await Booking.find({
         status: 'pending',
         serviceId: { $in: serviceIds },
         ignoredBy: { $ne: req.user._id }
     })
     .populate('serviceId')
-    .populate('userId', 'name phone');
-    
+    .populate('userId', 'name phone mobileNumber')
+    .sort({ scheduledDate: 1, createdAt: -1 });
+
     res.json(bookings);
 };
 

@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initBell();
     initOnlineToggle();
     fetchRequests(); fetchActiveJob(); fetchProviderBookings();
+    fetchProviderServices();  // Warn the provider if services are empty (so they know why requests might be filtered
     initProviderMap(); 
     setupDashboardAutoRefresh();
 });
@@ -170,44 +171,170 @@ async function fetchProviderBookings() {
         console.error('Error fetching provider bookings:', error);
     }
 }
+// ---------- Shared helpers: booking date + status rendering ----------
+
+// Produce a single pretty string combining scheduledDate + timeSlot.
+// scheduledDate may be a Date or ISO string (both parse fine).
+function formatBookingWhen(booking) {
+    const parts = [];
+    if (booking && booking.scheduledDate) {
+        const d = new Date(booking.scheduledDate);
+        if (!isNaN(d.getTime())) {
+            parts.push(d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }));
+        } else {
+            parts.push(String(booking.scheduledDate));
+        }
+    }
+    if (booking && booking.timeSlot) parts.push(String(booking.timeSlot));
+    return parts.join(' · ') || null;
+}
+
+function scheduledCardHtml(booking) {
+    const when = formatBookingWhen(booking);
+    if (!when) return '<div class="small text-muted mt-2"><i class="bi bi-lightning-charge me-1"></i>As soon as possible</div>';
+    return `<div class="small text-primary fw-bold mt-2 p-2 bg-primary bg-opacity-10 border border-primary border-opacity-25 rounded">
+                <i class="bi bi-calendar-event me-1"></i>${when}
+            </div>`;
+}
+
+function statusBadgeHtml(status) {
+    const s = String(status || '').replaceAll('_', ' ');
+    switch (status) {
+        case 'pending':     return `<span class="badge bg-warning text-dark">${s}</span>`;
+        case 'accepted':    return `<span class="badge bg-info text-dark">${s}</span>`;
+        case 'on_the_way':  return `<span class="badge bg-primary">${s}</span>`;
+        case 'completed':   return `<span class="badge bg-success">${s}</span>`;
+        case 'cancelled':   return `<span class="badge bg-danger">${s}</span>`;
+        default:            return `<span class="badge bg-secondary">${s}</span>`;
+    }
+}
+
+function bookingCardHtml(booking) {
+    const serviceName = booking.serviceId?.name || 'Service';
+    const customerName = booking.userId?.name || 'Customer';
+    const customerPhone = booking.userId?.mobileNumber || booking.userId?.phone || '';
+    const location = booking.userLocation?.address || 'Delhi';
+    const price = booking.price ? `₹${booking.price}` : (booking.serviceId?.price ? `₹${booking.serviceId.price}` : '-');
+    const sched = scheduledCardHtml(booking);
+    const badge = statusBadgeHtml(booking.status);
+    const createdAt = booking.createdAt ? new Date(booking.createdAt).toLocaleString() : '';
+    return `<div class="col-12 col-md-6 mb-2"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <div><h6 class="fw-bold m-0">${serviceName}</h6><small class="text-muted">${customerName}</small></div>
+            ${badge}
+        </div>
+        <div class="small text-muted"><i class="bi bi-geo-alt-fill text-danger me-1"></i>${location}</div>
+        ${customerPhone ? `<div class="small mt-1"><a href="tel:${customerPhone}" class="text-decoration-none"><i class="bi bi-telephone me-1"></i>${customerPhone}</a></div>` : ''}
+        ${sched}
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">${createdAt}</small>
+            <span class="fw-bold text-primary">${price}</span>
+        </div>
+    </div></div></div>`;
+}
+
+// ---------- Services-configured warning banner ----------
+async function fetchProviderServices() {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${CONFIG.apiBaseUrl}/provider/profile`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return;
+        const profile = await res.json();
+        const services = Array.isArray(profile.services) ? profile.services : [];
+        const warn = document.getElementById('servicesWarningContainer');
+        if (!warn) return;
+        if (services.length === 0) {
+            warn.innerHTML = `<div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <div>You have not selected which services you offer yet. New requests are currently showing the full catalog.
+                <a href="provider-profile.html" class="alert-link text-decoration-underline">Choose services in your profile</a> to personalize this dashboard.</div>
+            </div>`;
+        } else {
+            warn.innerHTML = '';
+        }
+    } catch (_) {}
+}
+
+// ---------- Assigned bookings: split into sections by status + scheduled date ----------
 function renderProviderBookings(bookings) {
     const container = document.getElementById('providerBookingsContainer');
     const count = document.getElementById('providerBookingsCount');
     if (!container) return;
-    if (count) count.textContent = `${bookings.length} booking${bookings.length === 1 ? '' : 's'}`;
-    if (bookings.length === 0) {
-        container.innerHTML = '<div class="col-12 text-center text-muted py-4">No bookings assigned yet.</div>';
+    const all = Array.isArray(bookings) ? bookings : [];
+
+    if (count) count.textContent = `${all.length} booking${all.length === 1 ? '' : 's'}`;
+    if (all.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center text-muted py-4">No bookings assigned yet. Accept a new request above to get started.</div>';
         return;
     }
-    container.innerHTML = bookings.map((booking) => {
-        const serviceName = booking.serviceId?.name || 'Service';
-        const customerName = booking.userId?.name || 'Customer';
-        const customerPhone = booking.userId?.mobileNumber || booking.userId?.phone || '';
-        const location = booking.userLocation?.address || 'Delhi';
-        const price = booking.price ? `₹${booking.price}` : (booking.serviceId?.price ? `₹${booking.serviceId.price}` : '-');
-        const scheduledInfo = (booking.scheduledDate || booking.timeSlot)
-            ? `<div class="small text-primary fw-bold mt-2"><i class="bi bi-calendar-event me-1"></i>${booking.scheduledDate || 'Flexible date'} ${booking.timeSlot || 'Any time'}</div>`
-            : '<div class="small text-muted mt-2">Flexible schedule</div>';
-        const badgeClass = booking.status === 'completed' ? 'bg-success' : booking.status === 'cancelled' ? 'bg-danger' : booking.status === 'on_the_way' ? 'bg-primary' : 'bg-warning text-dark';
-        return `<div class="col-12 col-md-6"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="d-flex justify-content-between align-items-start mb-2"><div><h6 class="fw-bold m-0">${serviceName}</h6><small class="text-muted">${customerName}</small></div><span class="badge ${badgeClass}">${booking.status.replaceAll('_', ' ')}</span></div><div class="small text-muted"><i class="bi bi-geo-alt-fill text-danger me-1"></i>${location}</div>${customerPhone ? `<div class="small mt-1"><a href="tel:${customerPhone}" class="text-decoration-none">${customerPhone}</a></div>` : ''}${scheduledInfo}<div class="d-flex justify-content-between align-items-center mt-3"><small class="text-muted">${new Date(booking.createdAt).toLocaleString()}</small><span class="fw-bold text-primary">${price}</span></div></div></div></div>`;
-    }).join('');
+
+    // Groups order: Upcoming (accepted with scheduled date OR on_the_way) → Accepted (no date) → Completed/Cancelled
+    const upcoming = all.filter(b => b.status === 'on_the_way' || (b.status === 'accepted' && (b.scheduledDate || b.timeSlot)));
+    const active   = all.filter(b => b.status === 'accepted' && !(b.scheduledDate || b.timeSlot));
+    const done     = all.filter(b => ['completed', 'cancelled'].includes(b.status));
+
+    // scheduled bookings first within each group
+    const bySchedule = (a, b) => {
+        const aT = a.scheduledDate ? new Date(a.scheduledDate).getTime() : Infinity;
+        const bT = b.scheduledDate ? new Date(b.scheduledDate).getTime() : Infinity;
+        if (aT !== bT) return aT - bT;
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    };
+    upcoming.sort(bySchedule); active.sort(bySchedule); done.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    const sectionHtml = (title, items, clsIcon, empty) => {
+        const badge = `<span class="badge rounded-pill bg-secondary ms-2">${items.length}</span>`;
+        const body = items.length
+            ? `<div class="row g-3 mb-3">${items.map(bookingCardHtml).join('')}</div>`
+            : `<div class="text-muted small mb-4">${empty}</div>`;
+        return `<div class="mb-4"><h6 class="text-muted m-0 mb-3"><i class="bi ${clsIcon} me-1"></i>${title}${badge}</h6>${body}</div>`;
+    };
+
+    container.innerHTML =
+        sectionHtml('Upcoming & Scheduled', upcoming, 'bi-calendar3-event-fill',  'No scheduled or on-the-way bookings.') +
+        sectionHtml('Accepted (As-Soon-As-Possible)', active,    'bi-check2-circle',   'No accepted bookings waiting for action.') +
+        sectionHtml('Completed / Cancelled',         done,      'bi-clock-history',   'No past bookings yet.');
 }
+
+// ---------- New Requests: scheduled requests bubble to the top with prominent banner ----------
 function renderRequests(requests) {
     const requestContainer = document.getElementById('requestContainer');
-    if (requests.length === 0) { requestContainer.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-hourglass-split fs-1"></i><p>Waiting for bookings...</p></div>'; return; }
+    const headerLabel = document.querySelector('#requestsSection h6');
+    const list = Array.isArray(requests) ? requests : [];
+
+    // Scheduled first, then newest first for immediate requests
+    list.sort((a, b) => {
+        const aT = a.scheduledDate ? new Date(a.scheduledDate).getTime() : Infinity;
+        const bT = b.scheduledDate ? new Date(b.scheduledDate).getTime() : Infinity;
+        if (aT !== bT) return aT - bT;
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+
+    if (headerLabel) {
+        const scheduled = list.filter(r => r.scheduledDate || r.timeSlot).length;
+        headerLabel.textContent = `New Requests (${list.length})` +
+            (scheduled > 0 ? ` · ${scheduled} scheduled` : '');
+    }
+
+    if (list.length === 0) {
+        requestContainer.innerHTML = `<div class="text-center text-muted py-5">
+            <i class="bi bi-hourglass-split fs-1"></i>
+            <p class="mt-2 mb-0">No new requests right now.</p>
+            <small class="text-muted">Bookings appear here within 5 seconds of being placed.</small>
+        </div>`;
+        return;
+    }
+
     let html = '';
-    requests.forEach(req => {
+    list.forEach(req => {
         const serviceName = req.serviceId ? req.serviceId.name : 'Unknown Service';
         const price = req.price ? `₹${req.price}` : (req.serviceId ? `₹${req.serviceId.price}` : '-');
         const location = req.userLocation && req.userLocation.address ? req.userLocation.address : 'Delhi';
         const customerName = req.userId && req.userId.name ? req.userId.name : 'Customer';
         const customerPhone = (req.userId && (req.userId.mobileNumber || req.userId.phone)) ? (req.userId.mobileNumber || req.userId.phone) : '';
-        const scheduledInfo = (req.scheduledDate || req.timeSlot) 
-            ? `<div class="mt-2 p-2 bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded">
-                <small class="fw-bold text-dark"><i class="bi bi-calendar-event me-1"></i> Scheduled: ${req.scheduledDate || ''} ${req.timeSlot || ''}</small>
-               </div>`
-            : '';
-        
+        const sched = scheduledCardHtml(req);
+        const createdTime = req.createdAt ? new Date(req.createdAt).toLocaleTimeString() : '';
+
         html += `
             <div class="card border-0 shadow-sm mb-3 request-card" id="card-${req._id}">
                 <div class="card-body">
@@ -222,9 +349,9 @@ function renderRequests(requests) {
                                 ${customerPhone ? `<br><small class="text-muted"><i class="bi bi-telephone me-1"></i><a href="tel:${customerPhone}" class="text-decoration-none">${customerPhone}</a></small>` : ''}
                             </div>
                         </div>
-                        <small class="text-muted d-block"><i class="bi bi-geo-alt-fill text-danger"></i> ${location}</small>
-                        <small class="text-muted"><i class="bi bi-clock"></i> ${new Date(req.createdAt).toLocaleTimeString()}</small>
-                        ${scheduledInfo}
+                        <small class="text-muted d-block mb-1"><i class="bi bi-geo-alt-fill text-danger me-1"></i>${location}</small>
+                        <small class="text-muted d-block mb-1"><i class="bi bi-clock me-1"></i>Requested ${createdTime}</small>
+                        ${sched}
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-danger flex-grow-1" onclick="rejectRequest('${req._id}')">Ignore</button>

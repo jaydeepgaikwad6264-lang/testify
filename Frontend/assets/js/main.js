@@ -1,4 +1,4 @@
-// Global configuration
+app.options('*', cors(corsOptions));// Global configuration
 const runtimeConfig = window.__APP_CONFIG__ || {};
 const CONFIG = {
     appName: 'Testify',
