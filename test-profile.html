@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Loading Test</title>
+</head>
+<body>
+    <h1>Profile Loading Test</h1>
+    <div id="debug"></div>
+    <div id="result"></div>
+    <div id="error"></div>
+    
+    <!-- Include the same scripts as account.html -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/auth.js"></script>
+    
+    <script>
+        // Test the profile loading
+        async function testProfileLoad() {
+            const debugDiv = document.getElementById('debug');
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            
+            try {
+                debugDiv.innerHTML = '<p>Testing profile loading...</p>';
+                
+                // Check if CONFIG is available
+                if (typeof CONFIG === 'undefined') {
+                    throw new Error('CONFIG is not defined');
+                }
+                debugDiv.innerHTML += '<p>CONFIG is available</p>';
+                debugDiv.innerHTML += `<p>API Base URL: ${CONFIG.apiBaseUrl}</p>`;
+                
+                // Check if token exists
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    throw new Error('No token found in localStorage');
+                }
+                debugDiv.innerHTML += '<p>Token found in localStorage</p>';
+                debugDiv.innerHTML += `<p>Token: ${token.substring(0, 20)}...</p>`;
+                
+                // Make the API call
+                debugDiv.innerHTML += '<p>Making API call...</p>';
+                const response = await fetch(`${CONFIG.apiBaseUrl}/auth/profile`, {
+                    method: 'GET',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                debugDiv.innerHTML += `<p>Response status: ${response.status}</p>`;
+                debugDiv.innerHTML += `<p>Response ok: ${response.ok}</p>`;
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    debugDiv.innerHTML += `<p>Error response: ${errorText}</p>`;
+                    throw new Error(`API Error: ${response.status} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `<h3>Success!</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+            } catch (error) {
+                console.error('Test error:', error);
+                errorDiv.innerHTML = `<h3>Error</h3><p>${error.message}</p>`;
+            }
+        }
+        
+        // Run test when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Test page loaded');
+            testProfileLoad();
+        });
+        
+        // Manual test button
+        function manualTest() {
+            testProfileLoad();
+        }
+    </script>
+    
+    <button onclick="manualTest()">Test Again</button>
+</body>
+</html>

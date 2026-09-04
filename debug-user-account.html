@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Account Debug</title>
+</head>
+<body>
+    <h1>User Account Debug Page</h1>
+    
+    <div id="debug-info" style="background: #f5f5f5; padding: 20px; margin: 20px; border-radius: 5px;">
+        <h3>Debug Information:</h3>
+        <div id="debug-content">Loading...</div>
+    </div>
+    
+    <div id="test-results" style="background: #e8f5e8; padding: 20px; margin: 20px; border-radius: 5px;">
+        <h3>Test Results:</h3>
+        <div id="results-content">Waiting for tests...</div>
+    </div>
+    
+    <button onclick="runAllTests()" style="margin: 20px; padding: 10px 20px; font-size: 16px;">Run All Tests</button>
+    
+    <!-- Include the same scripts as account.html in the same order -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/auth.js"></script>
+    
+    <script>
+        // Copy the exact loadUserData function from account.js with enhanced debugging
+        async function debugLoadUserData() {
+            const resultsDiv = document.getElementById('results-content');
+            resultsDiv.innerHTML = '<p>Starting loadUserData test...</p>';
+            
+            try {
+                const token = localStorage.getItem('token');
+                console.log('Token found:', token ? 'Yes' : 'No');
+                console.log('CONFIG:', CONFIG);
+                console.log('API URL:', `${CONFIG.apiBaseUrl}/auth/profile`);
+                
+                if (!token) {
+                    throw new Error('No token found in localStorage');
+                }
+                
+                resultsDiv.innerHTML += '<p>✓ Token found</p>';
+                resultsDiv.innerHTML += `<p>API URL: ${CONFIG.apiBaseUrl}/auth/profile</p>`;
+                
+                const response = await fetch(`${CONFIG.apiBaseUrl}/auth/profile`, {
+                    method: 'GET',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                resultsDiv.innerHTML += `<p>Response status: ${response.status}</p>`;
+                resultsDiv.innerHTML += `<p>Response ok: ${response.ok}</p>`;
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    resultsDiv.innerHTML += `<p style="color: red;"><strong>Error response:</strong> ${errorText}</p>`;
+                    
+                    if (response.status === 401) {
+                        resultsDiv.innerHTML += '<p style="color: orange;">Token expired or invalid - would redirect to login</p>';
+                        return { error: 'unauthorized' };
+                    }
+                    
+                    throw new Error(`Failed to load profile data: ${response.status} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Profile data received:', data);
+                resultsDiv.innerHTML += `<p style="color: green;"><strong>✓ Success! Profile data received:</strong></p>`;
+                resultsDiv.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                return data;
+                
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                resultsDiv.innerHTML += `<p style="color: red;"><strong>✗ Error loading user data:</strong> ${error.message}</p>`;
+                throw error;
+            }
+        }
+        
+        function runAllTests() {
+            const debugDiv = document.getElementById('debug-content');
+            const resultsDiv = document.getElementById('results-content');
+            
+            debugDiv.innerHTML = '';
+            resultsDiv.innerHTML = '<p>Running tests...</p>';
+            
+            // Test 1: Check CONFIG
+            debugDiv.innerHTML += `<p><strong>CONFIG available:</strong> ${typeof CONFIG !== 'undefined' ? '✓ Yes' : '✗ No'}</p>`;
+            if (typeof CONFIG !== 'undefined') {
+                debugDiv.innerHTML += `<p><strong>API Base URL:</strong> ${CONFIG.apiBaseUrl}</p>`;
+            }
+            
+            // Test 2: Check authentication
+            debugDiv.innerHTML += `<p><strong>isAuthenticated():</strong> ${isAuthenticated() ? '✓ Yes' : '✗ No'}</p>`;
+            
+            // Test 3: Check token and user
+            const token = localStorage.getItem('token');
+            const userStr = localStorage.getItem('user');
+            
+            debugDiv.innerHTML += `<p><strong>Token in localStorage:</strong> ${token ? '✓ Yes' : '✗ No'}</p>`;
+            debugDiv.innerHTML += `<p><strong>User in localStorage:</strong> ${userStr ? '✓ Yes' : '✗ No'}</p>`;
+            
+            if (token && userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    debugDiv.innerHTML += `<p><strong>User ID:</strong> ${user.id}</p>`;
+                    debugDiv.innerHTML += `<p><strong>User Role:</strong> ${user.role}</p>`;
+                    debugDiv.innerHTML += `<p><strong>User Active:</strong> ${user.isActive}</p>`;
+                    debugDiv.innerHTML += `<p><strong>Token (first 20 chars):</strong> ${token.substring(0, 20)}...</p>`;
+                } catch (e) {
+                    debugDiv.innerHTML += `<p style="color: red;"><strong>User JSON parse error:</strong> ${e.message}</p>`;
+                }
+            }
+            
+            // Test 4: Try to load profile data
+            if (token) {
+                debugLoadUserData().then(data => {
+                    if (data && !data.error) {
+                        resultsDiv.innerHTML += '<p style="color: green;"><strong>✓ All tests passed!</strong></p>';
+                        
+                        // Test form population
+                        if (data.name !== undefined) {
+                            resultsDiv.innerHTML += '<p>✓ Name data available</p>';
+                        }
+                        if (data.email !== undefined) {
+                            resultsDiv.innerHTML += '<p>✓ Email data available</p>';
+                        }
+                        if (data.mobileNumber !== undefined) {
+                            resultsDiv.innerHTML += '<p>✓ Mobile data available</p>';
+                        }
+                        if (data.role !== undefined) {
+                            resultsDiv.innerHTML += '<p>✓ Role data available</p>';
+                        }
+                        if (data.status !== undefined) {
+                            resultsDiv.innerHTML += '<p>✓ Status data available</p>';
+                        }
+                    }
+                }).catch(error => {
+                    resultsDiv.innerHTML += `<p style="color: red;"><strong>✗ Profile loading failed:</strong> ${error.message}</p>`;
+                });
+            } else {
+                resultsDiv.innerHTML += '<p style="color: orange;">No token available - cannot test profile loading</p>';
+            }
+        }
+        
+        // Run tests on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Debug page loaded');
+            runAllTests();
+        });
+    </script>
+</body>
+</html>

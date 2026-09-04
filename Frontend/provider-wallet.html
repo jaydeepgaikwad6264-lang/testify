@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Provider Wallet - Testify</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="assets/css/style.css" rel="stylesheet">
+    <style>
+        .wallet-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 15px;
+            color: white;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .wallet-balance {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+        }
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .transaction-item {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-left: 4px solid #28a745;
+        }
+        .transaction-item.negative {
+            border-left-color: #dc3545;
+        }
+        .withdraw-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border: none;
+            border-radius: 25px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+        .withdraw-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6c757d;
+        }
+        .empty-state i {
+            font-size: 4rem;
+            opacity: 0.5;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="p-3 shadow-sm bg-white d-flex justify-content-between align-items-center">
+            <h5 class="m-0 fw-bold text-primary">My Wallet</h5>
+            <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-secondary" href="provider-dashboard.html"><i class="bi bi-arrow-left"></i> Back</a>
+                <button class="btn btn-sm btn-outline-secondary" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</button>
+            </div>
+        </div>
+
+        <div class="container mt-4 pb-5">
+            <!-- Wallet Balance Card -->
+            <div class="card wallet-card mb-4">
+                <div class="card-body text-center py-4">
+                    <div class="mb-3">
+                        <i class="bi bi-wallet2 fs-1 opacity-75"></i>
+                    </div>
+                    <h6 class="text-light opacity-75 mb-2">Available Balance</h6>
+                    <p class="wallet-balance" id="walletBalance">₹0</p>
+                    <button class="btn btn-light withdraw-btn mt-3" onclick="initiateWithdrawal()">
+                        <i class="bi bi-arrow-down-circle me-2"></i>Withdraw to Bank
+                    </button>
+                </div>
+            </div>
+
+            <!-- Service Statistics -->
+            <h6 class="text-muted mb-3">Service Statistics</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-icon bg-primary bg-opacity-10 text-primary mx-auto mb-2">
+                            <i class="bi bi-heart-pulse"></i>
+                        </div>
+                        <h5 class="mb-1 fw-bold text-primary" id="bpCount">0</h5>
+                        <small class="text-muted">BP Checks</small>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-icon bg-success bg-opacity-10 text-success mx-auto mb-2">
+                            <i class="bi bi-droplet"></i>
+                        </div>
+                        <h5 class="mb-1 fw-bold text-success" id="sugarCount">0</h5>
+                        <small class="text-muted">Sugar Checks</small>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-icon bg-warning bg-opacity-10 text-warning mx-auto mb-2">
+                            <i class="bi bi-lightning"></i>
+                        </div>
+                        <h5 class="mb-1 fw-bold text-warning" id="comboCount">0</h5>
+                        <small class="text-muted">Combo Checks</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <h6 class="text-muted mb-3">Recent Transactions</h6>
+            <div id="transactionsContainer">
+                <div class="empty-state">
+                    <i class="bi bi-clock-history"></i>
+                    <h6 class="mb-2">No transactions yet</h6>
+                    <p class="mb-0">Complete your first booking to see earnings here</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <div class="nav-bottom">
+            <a href="provider-dashboard.html" class="nav-item">
+                <i class="bi bi-speedometer2"></i>
+                <span>Bookings</span>
+            </a>
+            <a href="provider-wallet.html" class="nav-item active">
+                <i class="bi bi-wallet2"></i>
+                <span>Wallet</span>
+            </a>
+            <a href="provider-account.html" class="nav-item">
+                <i class="bi bi-person-circle"></i>
+                <span>Account</span>
+            </a>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <ul class="nav justify-content-center">
+                    <li class="nav-item"><a href="privacy-policy.html" class="nav-link px-2 text-muted">Privacy Policy</a></li>
+                    <li class="nav-item"><a href="contact-us.html" class="nav-link px-2 text-muted">Contact Us</a></li>
+                </ul>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/main.js?v=20260201"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/provider-wallet.js"></script>
+</body>
+</html>

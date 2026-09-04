@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login - Testify</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container d-flex flex-column justify-content-center min-vh-100 p-4">
+        <div class="text-center mb-4">
+            <h1 class="text-primary fw-bold">Testify</h1>
+            <p class="text-muted">Login or Join with OTP</p>
+        </div>
+        
+        <form id="otpForm">
+            <!-- Role Selection -->
+            <div class="mb-3">
+                <label class="form-label d-block">I am a:</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="role" id="roleUser" value="user" checked>
+                    <label class="btn btn-outline-primary" for="roleUser">User</label>
+
+                    <input type="radio" class="btn-check" name="role" id="roleProvider" value="provider">
+                    <label class="btn btn-outline-primary" for="roleProvider">Provider</label>
+                </div>
+            </div>
+
+            <!-- Mobile Number Input -->
+            <div class="mb-3">
+                <label class="form-label">Mobile Number</label>
+                <div class="input-group">
+                    <span class="input-group-text">+91</span>
+                    <input type="tel" class="form-control" id="mobileNumber" placeholder="Enter mobile number" required pattern="[0-9]{10}" maxlength="10">
+                </div>
+            </div>
+
+            <!-- OTP Input (Initially Hidden) -->
+            <div class="mb-3 d-none" id="otpContainer">
+                <label class="form-label">Enter OTP</label>
+                <input type="text" class="form-control" id="otpInput" placeholder="Enter 6-digit OTP" maxlength="6">
+                <div class="form-text text-end" id="timerContainer"></div>
+            </div>
+
+            <div id="loginError" class="text-danger small mb-3"></div>
+
+            <!-- Buttons -->
+            <button type="button" id="sendOtpBtn" class="btn btn-primary-custom w-100 py-2">Send OTP</button>
+            <button type="submit" id="verifyOtpBtn" class="btn btn-success w-100 py-2 d-none">Verify & Login</button>
+        </form>
+
+        <!-- Legacy Links (Hidden or Removed as per requirement, but kept minimalistic) -->
+        <!-- <div class="text-center mt-3">
+            <p class="small">Don't have an account? <a href="register.html">Register</a></p>
+        </div> -->
+    </div>
+
+    <script src="assets/js/main.js?v=20260201"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+        const otpForm = document.getElementById('otpForm');
+        const sendOtpBtn = document.getElementById('sendOtpBtn');
+        const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+        const otpContainer = document.getElementById('otpContainer');
+        const mobileInput = document.getElementById('mobileNumber');
+        const otpInput = document.getElementById('otpInput');
+        const errorDiv = document.getElementById('loginError');
+        
+        let verificationId = null;
+
+        sendOtpBtn.addEventListener('click', async () => {
+            const mobile = mobileInput.value;
+            if (!mobile || mobile.length !== 10) {
+                errorDiv.textContent = 'Please enter a valid 10-digit mobile number';
+                return;
+            }
+
+            try {
+                sendOtpBtn.disabled = true;
+                sendOtpBtn.textContent = 'Sending...';
+                errorDiv.textContent = '';
+
+                const data = await sendOtp(mobile);
+                verificationId = data.verificationId;
+
+                // UI Update
+                otpContainer.classList.remove('d-none');
+                verifyOtpBtn.classList.remove('d-none');
+                sendOtpBtn.classList.add('d-none');
+                mobileInput.disabled = true;
+                
+                // Disable role selection once OTP is sent to prevent switching context mid-flow
+                document.querySelectorAll('input[name="role"]').forEach(el => el.disabled = true);
+
+                otpInput.focus();
+
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.textContent = 'Send OTP';
+            }
+        });
+
+        otpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const otp = otpInput.value;
+            const mobile = mobileInput.value;
+            const role = document.querySelector('input[name="role"]:checked').value;
+
+            if (!otp) {
+                errorDiv.textContent = 'Please enter OTP';
+                return;
+            }
+
+            try {
+                verifyOtpBtn.disabled = true;
+                verifyOtpBtn.textContent = 'Verifying...';
+                errorDiv.textContent = '';
+
+                const data = await verifyOtp({
+                    mobileNumber: mobile,
+                    otp: otp,
+                    verificationId: verificationId,
+                    role: role
+                });
+
+                // Handle Success Logic
+                if (data.isProviderPending) {
+                    alert(data.message || 'Your provider account is under review.');
+                    window.location.href = 'provider-profile.html';
+                    return;
+                }
+
+                if (data.role === 'provider') {
+                    if (data.status === 'REJECTED') {
+                        alert('Your provider account has been rejected. Please contact support.');
+                        logout();
+                        return;
+                    }
+                    if (data.status === 'PENDING' || !data.isActive) {
+                        alert('Your provider account is under review.');
+                        window.location.href = 'provider-profile.html';
+                        return;
+                    }
+                    window.location.href = 'provider-dashboard.html';
+                } else {
+                    // User Flow
+                    if (!data.isProfileComplete) {
+                        // Maybe redirect to profile update?
+                        // "After first login: Redirect to profile page"
+                        // But requirements say "Redirect to home / previous page" first? 
+                        // "After first login: Redirect to profile page"
+                        // For now, let's just go to index or user-dashboard.
+                        window.location.href = 'user-dashboard.html';
+                    } else {
+                        window.location.href = 'index.html';
+                    }
+                }
+
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                verifyOtpBtn.disabled = false;
+                verifyOtpBtn.textContent = 'Verify & Login';
+            }
+        });
+    </script>
+</body>
+</html>

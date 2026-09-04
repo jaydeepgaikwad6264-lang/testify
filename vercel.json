@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" }
+      ]
+    }
+  ],
+  "routes": [
+    { "src": "^/$", "dest": "/Frontend/index.html" },
+    { "src": "^/admin/?$", "dest": "/Frontend/admin/index.html" },
+    { "src": "^/assets/(.*)$", "dest": "/Frontend/assets/$1" },
+    { "src": "^/(privacy-policy|terms|refund-policy|about|contact|medical-disclaimer)$", "dest": "/Frontend/public/$1/index.html" },
+    { "src": "^/(privacy-policy|terms|refund-policy|about|contact|medical-disclaimer)\\.html$", "dest": "/Frontend/public/$1/index.html" },
+    { "src": "^/(.*)$", "dest": "/Frontend/$1" }
+  ]
+}

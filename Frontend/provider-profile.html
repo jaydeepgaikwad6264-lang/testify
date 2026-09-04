@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Complete Profile - Testify</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container p-4">
+        <div id="pendingScreen" class="d-none">
+            <h4 class="mb-3">Your account is under review</h4>
+            <p class="text-muted small mb-3">
+                Our team is reviewing your provider application. You will be notified once approved.
+            </p>
+            <p class="small mb-3">
+                For support, contact us at <a href="mailto:support@testify.app">support@testify.app</a>.
+            </p>
+            <button type="button" class="btn btn-outline-secondary w-100 mb-2" onclick="logout()">Logout</button>
+        </div>
+        <div id="profileFormContainer">
+            <h4 class="mb-4">Complete Your Provider Profile</h4>
+            <p class="text-muted small">You must complete this step to start accepting bookings.</p>
+            <form id="profileForm">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Select Services</label>
+                <div class="form-check">
+                    <input class="form-check-input service-check" type="checkbox" value="BP Check" id="bpCheck">
+                    <label class="form-check-label" for="bpCheck">BP Check</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input service-check" type="checkbox" value="Sugar Check" id="sugarCheck">
+                    <label class="form-check-label" for="sugarCheck">Sugar Check</label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Experience (Years)</label>
+                <input type="number" class="form-control" id="experience" min="0" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Upload Documents (Aadhar, License, etc.)</label>
+                <input type="file" class="form-control" id="documents" multiple accept=".jpg,.jpeg,.png,.pdf" required>
+                <small class="text-muted">Max 5 files. JPG, PNG, PDF only.</small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Current Location (Delhi)</label>
+                <div class="row g-2">
+                    <div class="col">
+                        <input type="number" step="any" class="form-control" placeholder="Lat" id="lat" value="28.6139" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" step="any" class="form-control" placeholder="Lng" id="lng" value="77.2090" required>
+                    </div>
+                </div>
+                <small class="text-muted">Defaulted to CP, Delhi for demo.</small>
+            </div>
+            <button type="submit" class="btn btn-success w-100">Apply</button>
+            </form>
+        </div>
+    </div>
+    <script src="assets/js/main.js?v=20260201"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+        (function () {
+            const user = getCurrentUser();
+            if (user && user.role === 'provider' && user.status === 'PENDING' && user.isActive === false) {
+                const pending = document.getElementById('pendingScreen');
+                const formContainer = document.getElementById('profileFormContainer');
+                if (pending && formContainer) {
+                    pending.classList.remove('d-none');
+                    formContainer.classList.add('d-none');
+                }
+            }
+        })();
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const services = Array.from(document.querySelectorAll('.service-check:checked')).map(cb => cb.value);
+            const experience = document.getElementById('experience').value;
+            const lat = parseFloat(document.getElementById('lat').value);
+            const lng = parseFloat(document.getElementById('lng').value);
+            const docFiles = document.getElementById('documents').files;
+            const token = localStorage.getItem('token');
+            if(services.length === 0) {
+                alert('Select at least one service');
+                return;
+            }
+            if(docFiles.length === 0) {
+                alert('Upload at least one document');
+                return;
+            }
+            try {
+                // 1. Upload Documents first
+                const formData = new FormData();
+                for (let i = 0; i < docFiles.length; i++) {
+                    formData.append('documents', docFiles[i]);
+                }
+                const uploadRes = await fetch(`${CONFIG.apiBaseUrl}/provider/upload-documents`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.message);
+
+                // 2. Update profile
+                const response = await fetch(`${CONFIG.apiBaseUrl}/provider/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        services,
+                        experience,
+                        location: { lat, lng }
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message);
+                alert('Application submitted. Await admin approval. You will be logged out now.');
+                try {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                } catch (_) {}
+                window.location.href = 'login.html';
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        });
+    </script>
+</body>
+</html>
