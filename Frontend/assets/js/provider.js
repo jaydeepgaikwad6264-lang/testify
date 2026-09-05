@@ -26,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initBell();
     initOnlineToggle();
     fetchRequests(); fetchActiveJob(); fetchProviderBookings();
-    fetchProviderServices();  // Warn the provider if services are empty (so they know why requests might be filtered
+    fetchProviderServices();  // Warn the provider if services are empty (so they know why requests might be filtered)
+    fetchWallet();            // Populate the header wallet balance on dashboard load
     initProviderMap(); 
     setupDashboardAutoRefresh();
 });
@@ -44,6 +45,7 @@ function setupDashboardAutoRefresh() {
         if (document.visibilityState !== 'visible') return;
         fetchActiveJob();
         fetchProviderBookings();
+        fetchWallet();            // Real-time wallet balance sync every 60s
         updateLiveLocation();
     }, PROVIDER_LOCATION_REFRESH_MS);
 
@@ -51,8 +53,7 @@ function setupDashboardAutoRefresh() {
         fetchRequests();
         fetchActiveJob();
         fetchProviderBookings();
-        fetchProviderBookings();
-        fetchProviderBookings();
+        fetchWallet();
     });
 
     document.addEventListener('visibilitychange', () => {
@@ -149,8 +150,12 @@ async function fetchWallet() {
         const res = await fetch(`${CONFIG.apiBaseUrl}/provider/wallet`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) return;
         const w = await res.json();
+        const balance = Number(w && w.balance ? w.balance : 0);
         const toCurrency = (n) => `${CONFIG.currency}${Number(n||0).toFixed(0)}`;
-        const wb = document.getElementById('walletBalance'); if (wb) wb.textContent = toCurrency(w.balance || 0);
+        // All places wallet balance displays in the UI (header pill + wallet page)
+        const formatted = toCurrency(balance);
+        const wb = document.getElementById('walletBalance'); if (wb) wb.textContent = formatted;
+        const wbh = document.getElementById('walletBalanceHeader'); if (wbh) wbh.textContent = formatted;
         const bp = document.getElementById('walletBp'); if (bp) bp.textContent = String(w.bpCount || 0);
         const sg = document.getElementById('walletSugar'); if (sg) sg.textContent = String(w.sugarCount || 0);
         const cb = document.getElementById('walletCombo'); if (cb) cb.textContent = String(w.comboCount || 0);
@@ -636,6 +641,8 @@ async function completeJob() {
         document.getElementById('requestsSection').classList.remove('d-none');
         fetchRequests();
         fetchActiveJob();
+        fetchProviderBookings();
+        fetchWallet();            // Real-time update: credit is already on the backend, so fetch immediately
     } catch (error) { alert("Error completing job: " + error.message); }
 }
 async function cancelJob() {
@@ -650,5 +657,7 @@ async function cancelJob() {
         document.getElementById('requestsSection').classList.remove('d-none');
         fetchRequests();
         fetchActiveJob();
+        fetchProviderBookings();
+        fetchWallet();            // Some cancel flows may deduct/refund; keep the header in sync
     } catch (e) { alert('Error cancelling: ' + e.message); }
 }

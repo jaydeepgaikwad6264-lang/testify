@@ -1,4 +1,3 @@
-app.options('*', cors(corsOptions));// Global configuration
 // Global configuration
 const runtimeConfig = window.__APP_CONFIG__ || {};
 const CONFIG = {
